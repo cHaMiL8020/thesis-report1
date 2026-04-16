@@ -1,0 +1,21 @@
+# Local sync state
+.repo_sync_state.json
+
+# Common LaTeX build files
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.log
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.tmp
+*.xdv

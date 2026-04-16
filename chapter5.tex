@@ -1,0 +1,664 @@
+
+\section{Data Sources}
+\label{sec:data_sources}
+
+This thesis uses an engineered Austrian hourly multivariate electricity dataset spanning the period from January 2017 to December 2022 and indexed in Coordinated Universal Time (UTC). The dataset is designed to support anomaly detection for electricity markets and grid operations under weather uncertainty, and therefore combines two broad information classes: operational market--grid signals and exogenous meteorological drivers. In the implemented pipeline, these heterogeneous sources are consolidated into the engineered research table \texttt{AT\_engineered\_hourly.csv}, which serves as the principal data source for modeling, threshold calibration, anomaly detection, and subsequent symbolic refinement \cite{abeysekara2025report,repo_preprocess_features,repo_base_config}.
+
+Unlike a single-purpose forecasting dataset, the data foundation of this thesis is explicitly multi-source and anomaly-oriented. The objective is not merely to predict one scalar variable, but to model the joint behaviour of price, load, renewable generation, and weather-sensitive context. For this reason, the repository preprocessing stage does not treat the Austrian hourly data as a flat tabular file. Instead, it constructs the final modeling table by integrating four primary source layers \cite{entsoe_transparency,entsoe_installed_capacity,openmeteo_historical,python_holidays}:
+\begin{enumerate}
+	\item \textbf{Energy-market and grid data}, obtained from the \textbf{ENTSO-E Transparency Platform}, including day-ahead electricity price (EUR/MWh), total load (MW), and solar and wind generation (MW);
+	\item \textbf{Weather data}, obtained from the \textbf{Open-Meteo Historical API}, including temperature (\textdegree C), humidity (\%), wind speed (m/s), pressure (hPa), precipitation (mm), and solar radiation (W/m$^2$);
+	\item \textbf{Installed-capacity data}, obtained from \textbf{ENTSO-E}, including solar and wind installed capacity (MW), used to derive annual renewable capacity factors;
+	\item \textbf{Calendar data}, generated using the \textbf{Python \texttt{holidays} library}, from which hour-of-day context, weekday/month structure, and public-holiday flags are incorporated into the engineered dataset.
+\end{enumerate}
+
+The engineered dataset is therefore best understood not as a single raw source file, but as a research-ready integration layer built from electricity-market measurements, grid-operational variables, weather observations, installed-capacity information, and calendar context. This integrated structure is methodologically important because anomaly detection in weather-driven electricity systems depends on modeling not only the observed market and grid variables themselves, but also the exogenous and contextual factors that explain their normal variation. In this sense, the dataset supports the core thesis assumption that anomalous behaviour should be interpreted conditionally, not in isolation.
+
+Table~\ref{tab:dataset_sources_full} summarizes the main data-source groups used in the present study.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Overview of the main dataset source layers used in the thesis.}
+	\label{tab:dataset_sources_full}
+	\small
+	\begin{tabular}{|p{2.8cm}|p{6.0cm}|p{3.2cm}|}
+		\hline
+		\textbf{Type} & \textbf{Variables} & \textbf{Source} \\
+		\hline
+		Energy Market & Day-ahead price (EUR/MWh), total load (MW), solar generation (MW), wind generation (MW) & ENTSO-E Transparency Platform \\
+		\hline
+		Weather & Temperature (\textdegree C), humidity (\%), wind speed (m/s), pressure (hPa), precipitation (mm), solar radiation (W/m$^2$) & Open-Meteo Historical API \\
+		\hline
+		Installed Capacity & Solar capacity (MW), wind capacity (MW) & ENTSO-E \\
+		\hline
+		Calendar & Hour-of-day context, weekday, month, public-holiday flags & Python \texttt{holidays} library \\
+		\hline
+	\end{tabular}
+\end{table}
+
+Within the repository implementation, these upstream data resources are aligned and transformed into the engineered hourly dataset referenced in the base configuration as \texttt{data/AT\_engineered\_hourly.csv}, while the public-holiday calendar is stored separately as \texttt{data/AT\_public\_holidays\_2017\_2022.csv} before being merged during preprocessing \cite{repo_preprocess_features,repo_base_config,repo_make_holidays}. This section focuses on the provenance, structure, temporal coverage, and analytical role of those data sources. The detailed construction of holiday indicators, weather-driven capacity factors, and downstream engineered variables is deferred to Section~5.2 in order to avoid repetition.
+
+\subsection{Dataset Provenance and Temporal Coverage}
+
+According to the repository implementation, the time horizon of the study is six full calendar years, from 2017-01-01 to 2022-12-31 23:00 UTC \cite{abeysekara2025report,repo_base_config}. This horizon is sufficiently long to capture seasonal structure, year-to-year variation, and changing weather conditions, while still preserving a realistic chronological split for training, calibration, and testing. In the current project configuration, the split is:
+\begin{itemize}
+	\item \textbf{Training period:} 2017--2020,
+	\item \textbf{Validation period:} 2021,
+	\item \textbf{Test period:} 2022.
+\end{itemize}
+This temporal arrangement is central to the thesis design because it reflects operational deployment logic: the model learns on earlier years, calibrates its uncertainty thresholds on a later but still historical year, and is finally evaluated on an unseen future year.
+
+From the repository’s point of view, the engineered dataset stored at \texttt{data/AT\_engineered\_hourly.csv} is the direct input to the split-and-scale stage. However, that engineered file is itself the product of a prior source-integration process implemented in \texttt{src/01\_preprocess\_build\_features.py} \cite{repo_preprocess_features}. The script explicitly declares the following source dependencies:
+\begin{itemize}
+	\item \texttt{data/AT\_hourly\_MW\_and\_Price.csv} as the raw hourly operational and weather data source,
+	\item \texttt{data/Installed Capacity per Production Type\_201701010000-202301010000.csv} as the annual installed-capacity source,
+	\item \texttt{data/AT\_public\_holidays\_2017\_2022.csv} as the holiday-context source.
+\end{itemize}
+Therefore, although the experimental chapters work primarily with the engineered CSV, the true data provenance of the thesis is multi-layered.
+
+\subsection{Core Austrian Hourly MW and Price Dataset}
+
+The foundational raw file in the repository is the Austrian hourly dataset referenced in the preprocessing script as \texttt{AT\_hourly\_MW\_and\_Price.csv} \cite{repo_preprocess_features}. This file is structured around the timestamp field \texttt{Time (UTC)} and contains the core hourly measurements used to characterize electricity-system behaviour. Based on the preprocessing requirements and dataset overview, the key operational variables are:
+\begin{itemize}
+	\item day-ahead electricity price (\euro{}/MWh),
+	\item total system load (MW),
+	\item solar generation (MW),
+	\item wind generation (MW).
+\end{itemize}
+In addition, the same hourly file contains weather variables required to explain renewable and demand variation, including:
+\begin{itemize}
+	\item near-surface temperature,
+	\item relative humidity,
+	\item wind speed,
+	\item surface pressure,
+	\item shortwave solar radiation.
+\end{itemize}
+
+This combination is methodologically important. The dataset does not treat price and load as isolated time series. It explicitly embeds them in the broader operational environment of renewable generation and weather conditions. That choice is essential for the thesis because the anomaly concept adopted here is \emph{context-dependent}. A deviation in price, load, or renewable output can only be interpreted properly when the environmental drivers of normal behaviour are visible in the data.
+
+The repository preprocessing script enforces a strict schema for the raw hourly file. It checks for the presence of key columns such as \texttt{Solar\_MW}, \texttt{Wind\_MW}, \texttt{DA\_Price\_EUR\_MWh}, \texttt{temperature\_2m (°C)}, \texttt{relative\_humidity\_2m (\%)}, \texttt{surface\_pressure (hPa)}, \texttt{wind\_speed\_10m (m/s)}, and \texttt{shortwave\_radiation (W/m²)} \cite{repo_preprocess_features}. This is a useful methodological detail because it shows that the data engineering pipeline is not informal or ad hoc; it is guarded by explicit column validation and failure checks.
+
+\subsection{Installed-Capacity Data and Renewable Normalization}
+
+A second critical data source is the installed-capacity dataset, referenced in the repository as \texttt{Installed Capacity per Production Type\_201701010000-202301010000.csv} \cite{repo_preprocess_features}. This source is annual rather than hourly, and it is used to transform raw renewable generation into renewable capacity factors. In the preprocessing stage, capacity values are melted into year-wise records, filtered by production type, aggregated into annual solar and wind capacity series, and then mapped back to the hourly timeline. This enables the computation of:
+\begin{equation}
+	\mathrm{CF}_{\mathrm{Solar},t} = \frac{\mathrm{Solar\_MW}_t}{\mathrm{Solar\_Cap\_MW}_t},
+	\qquad
+	\mathrm{CF}_{\mathrm{Wind},t} = \frac{\mathrm{Wind\_MW}_t}{\mathrm{Wind\_Cap\_MW}_t}.
+	\label{eq:capacity_factors_data}
+\end{equation}
+The report notes that these capacity factors are clipped to a reasonable upper bound, which prevents unrealistic values from dominating downstream modeling \cite{abeysekara2025report}.
+
+The inclusion of installed-capacity data is a substantive methodological choice. It means that renewable behaviour is modeled not only in absolute output terms, but also in normalized terms relative to the evolving annual generation fleet. This is particularly valuable for long-horizon studies such as 2017--2022, because changes in installed solar and wind capacity can otherwise distort anomaly interpretation. A high solar output in one year may reflect a different operational meaning in another year if the installed base has changed substantially. Capacity-factor normalization reduces this comparability problem.
+
+\subsection{Holiday Calendar as a Context Source}
+
+A third data source is the Austrian public-holiday table, generated separately and then consumed during preprocessing. The approach utilized explicitly emphasizes that holiday logic is part of the contextual representation of normality, especially because some low-load patterns are expected rather than abnormal on public holidays \cite{abeysekara2025report}. In the repository, the preprocessing stage loads the holiday CSV, normalizes dates, and adds three binary context fields:
+\begin{itemize}
+	\item \texttt{is\_public\_holiday},
+	\item \texttt{is\_weekend},
+	\item \texttt{is\_special\_day}.
+\end{itemize}
+
+Although these variables are later discussed more fully in Section~5.2, they are already relevant here because they are part of the source-level dataset design rather than merely downstream engineered features. Their inclusion confirms that the data foundation of the thesis is not purely physical or market-based; it is also calendar-aware. This is critical because the symbolic veto layer later uses holiday context explicitly when deciding whether some anomalies should be retained or suppressed.
+
+\subsection{From Raw Sources to \texttt{AT\_engineered\_hourly.csv}}
+
+The practical dataset used throughout the experiments is not the raw hourly file itself, but the engineered output \texttt{AT\_engineered\_hourly.csv}. This file is the consolidated product of the source integration process and therefore represents the principal experimental dataset of the thesis \cite{repo_base_config,repo_preprocess_features}. The report’s dataset overview and feature-list sections make clear that this engineered file contains:
+\begin{itemize}
+	\item the core measured signals,
+	\item the derived targets \texttt{CF\_Solar}, \texttt{CF\_Wind}, \texttt{Load\_MW}, and \texttt{Price},
+	\item the meteorological explanatory variables,
+	\item the calendar and holiday context variables,
+	\item and the derived physical proxies used later in modeling.
+\end{itemize}
+
+A key methodological advantage of using a single engineered CSV is that it provides a stable and reproducible interface between data engineering and model development. Once source alignment, normalization, and context enrichment have been completed, all subsequent stages-splitting, scaling, dCeNN encoding, ELM forecasting, threshold calibration, anomaly detection, ASP refinement, and evaluation-operate on the same consistent hourly table. This improves pipeline traceability and reduces the risk of inconsistencies between training and evaluation phases.
+
+\begin{table}[H]
+	\centering
+	\caption{Main data sources underlying the Austrian engineered hourly dataset.}
+	\label{tab:data_sources_overview}
+	\small
+	\begin{tabular}{|p{4.0cm}|p{5.0cm}|p{5.5cm}|}
+		\hline
+		\textbf{Source} & \textbf{Representative contents} & \textbf{Role in the thesis} \\
+		\hline
+		Raw hourly Austrian MW and price data & Price, load, solar MW, wind MW, weather variables, UTC timestamp & Provides the core operational and meteorological observations used for anomaly modeling \\
+		\hline
+		Installed-capacity data & Annual installed capacity by production type & Enables capacity-factor normalization for solar and wind \\
+		\hline
+		Holiday calendar & Austrian public-holiday dates & Supplies context for expected regime shifts such as holiday load changes \\
+		\hline
+		Engineered hourly dataset \path{AT_engineered_hourly.csv} & Consolidated multivariate hourly table & Serves as the primary experimental dataset for the modeling pipeline \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsection{Temporal Granularity, Indexing, and Suitability for Anomaly Detection}
+
+The hourly temporal resolution of the dataset is a strong methodological fit for the problem addressed in this thesis. Hourly data are fine-grained enough to capture operational variation in load, day-ahead prices, and renewable generation, while still being coarse enough to support robust multiyear modeling and practical calibration. The common UTC index also facilitates integration across sources and prevents ambiguity in temporal alignment.
+
+From an anomaly-detection perspective, the dataset has three particularly desirable properties.
+
+First, it is \textbf{multivariate}. This is crucial because many meaningful anomalies in electricity systems are not univariate spikes, but cross-variable inconsistencies.
+
+Second, it is \textbf{context-rich}. Weather variables and holiday context allow the model to distinguish between expected variation and suspicious deviation.
+
+Third, it is \textbf{longitudinal}. Covering six full years, it includes multiple seasonal cycles and regime conditions, making it suitable for chronological split-based evaluation and uncertainty-aware threshold calibration.
+
+These properties make the Austrian hourly dataset more than a generic forecasting benchmark. It is a structurally appropriate substrate for the kind of neuro-symbolic anomaly pipeline proposed in this thesis.
+
+\subsection{Data Quality and Preprocessing Assumptions}
+
+The repository preprocessing script also reveals several data-quality assumptions. Duplicate timestamps are explicitly detected and removed by keeping the first occurrence. The raw file is subset to the configured date range, and the pipeline fails early if the resulting time window is empty or if required columns are missing \cite{repo_preprocess_features}. These checks are important because anomaly detection is highly sensitive to data alignment and schema integrity. A missing or inconsistent column in the raw data can propagate into misleading anomaly behaviour later in the pipeline.
+
+At the same time, the thesis does not attempt to frame the dataset as perfect or exhaustive. The data source strategy is pragmatic: it combines the most relevant hourly operational and exogenous drivers needed to define and test the proposed anomaly framework. In that sense, the goal of the data design is not maximal breadth, but methodological sufficiency for forecasting-based anomaly detection under weather uncertainty.
+
+\subsection{Summary}
+
+In summary, the data foundation of this thesis consists of a multi-source Austrian hourly dataset built from raw electricity and weather observations, annual installed-capacity records, and holiday context. These sources are consolidated into the engineered hourly file \texttt{AT\_engineered\_hourly.csv}, which serves as the primary dataset for all subsequent experiments. The resulting data design is well matched to the thesis objectives: it is multivariate, context-rich, long-horizon, and chronologically structured, making it suitable for forecasting-based anomaly detection, context-aware threshold calibration, and later symbolic refinement. The next section explains how this source data is transformed into the specific engineered features used by the dCeNN--ELM forecasting backbone.
+
+
+\section{Feature Engineering}
+\label{sec:feature_engineering}
+
+This section describes the feature-engineering strategy used to transform the raw Austrian hourly data sources into the structured multivariate representation consumed by the dCeNN--ELM forecasting backbone. To avoid repetition, the present section does not restate the full source provenance already introduced in Section~5.1. Instead, it focuses on the \emph{engineering logic} by which raw measurements are converted into context-rich explanatory variables suitable for forecasting-based anomaly detection.
+
+Within the proposed framework, feature engineering serves three purposes. First, it injects domain knowledge directly into the neural input space. Second, it makes the forecasting problem context-aware by encoding weather, calendar, and seasonal effects explicitly. Third, it reduces the risk that the anomaly detector will confuse expected contextual variation with genuine abnormality. This is particularly important in electricity-market and grid settings, where large shifts in load, price, wind, or solar generation may be completely normal under specific meteorological or calendar regimes \cite{abeysekara2025report,repo_preprocess_features}.
+
+At the implementation level, the feature-engineering process is distributed across two main scripts:
+\begin{itemize}
+	\item \texttt{src/00\_make\_holidays.py}, which constructs the Austrian public-holiday calendar as a dedicated CSV \cite{repo_make_holidays};
+	\item \texttt{src/01\_preprocess\_build\_features.py}, which aligns the raw hourly data, computes derived features, generates capacity factors, adds calendar encodings, and writes the engineered dataset \texttt{AT\_engineered\_hourly.csv} \cite{repo_preprocess_features}.
+\end{itemize}
+
+\subsection{Feature Engineering as a Domain-Aware Modeling Layer}
+
+The engineered feature space is intentionally broader than the raw operational variables. Rather than training the neural forecaster only on price and generation measurements, the framework augments the input with exogenous drivers, derived physical proxies, and calendar markers. Formally, if $\mathbf{x}_t^{\mathrm{raw}}$ denotes the aligned raw hourly observation at time $t$, the engineered vector is constructed as
+\begin{equation}
+	\mathbf{x}_t^{\mathrm{eng}} = \Phi\!\left(\mathbf{x}_t^{\mathrm{raw}}, \mathbf{c}_t, \mathbf{w}_t, \mathbf{p}_t\right),
+	\label{eq:feat_general}
+\end{equation}
+where $\mathbf{c}_t$ denotes calendar context, $\mathbf{w}_t$ denotes weather variables, and $\mathbf{p}_t$ denotes derived physical proxies such as capacity factors or wind-power surrogates. The operator $\Phi(\cdot)$ is not a purely statistical transformation. It is a domain-informed construction that embeds known explanatory structure into the model input.
+
+This design choice is essential for a forecasting-based anomaly detector. If the neural model is deprived of weather and calendar context, then systematic and expected variations may appear anomalous simply because the model lacks the variables needed to explain them. Feature engineering therefore acts as a first layer of anomaly disambiguation: it helps the system distinguish \emph{normal but context-dependent variation} from \emph{unexpected deviation}.
+
+\subsection{Holiday and Calendar Features}
+
+A central part of the engineered context is the holiday and calendar representation. In the repository, \texttt{src/00\_make\_holidays.py} generates an Austrian public-holiday calendar for the years 2017--2022 using the \texttt{holidays} package and stores it as a dedicated CSV referenced in the base configuration \cite{repo_make_holidays,repo_base_config}. Each holiday is stored with a UTC-normalized date and a holiday name, producing a machine-readable calendar artifact that can be joined consistently with the hourly time index.
+
+The preprocessing stage then uses this calendar file to construct three binary context indicators:
+\begin{align}
+	\texttt{is\_public\_holiday}_t &\in \{0,1\}, \\
+	\texttt{is\_weekend}_t &\in \{0,1\}, \\
+	\texttt{is\_special\_day}_t &\in \{0,1\},
+\end{align}
+where the final indicator is defined as the logical union of holiday and weekend status. These variables are simple in form but highly important in meaning. They allow the model to represent demand reductions, unusual daily rhythms, or market anomalies that are structurally associated with special calendar conditions rather than with genuine system stress.
+
+In addition to discrete holiday flags, the preprocessing script constructs cyclical calendar encodings for hour-of-day, day-of-week, and month-of-year. For a periodic variable $u_t$ with period $P$, the general transformation is
+\begin{equation}
+	u_t \mapsto \left(\sin\!\frac{2\pi u_t}{P}, \cos\!\frac{2\pi u_t}{P}\right).
+	\label{eq:cyclical_encoding}
+\end{equation}
+Accordingly, the repository adds:
+\begin{itemize}
+	\item \texttt{hour\_sin}, \texttt{hour\_cos};
+	\item \texttt{dow\_sin}, \texttt{dow\_cos};
+	\item \texttt{month\_sin}, \texttt{month\_cos}.
+\end{itemize}
+These encodings are preferable to raw integer time indices because they preserve the circular structure of periodic variables. For example, hour 23 and hour 0 are close in reality but far apart numerically if represented directly as integers. The sinusoidal encoding resolves this discontinuity and allows the model to learn periodic structure more naturally.
+
+From an anomaly-detection perspective, these calendar features are not merely descriptive conveniences. They encode \emph{expected periodicity}. This reduces the chance that the neural detector will treat regular diurnal or seasonal cycles as suspicious. In the later ASP stage, the holiday-derived facts also become part of the symbolic veto logic, which shows that the calendar features serve both the neural and the symbolic sides of the framework.
+
+\subsection{Weather-Driven Capacity Factors}
+
+Renewable generation must be interpreted relative to installed capacity rather than in absolute megawatt terms alone. For this reason, the preprocessing script computes annual installed-capacity series for solar and wind from the auxiliary installed-capacity dataset and maps them to the hourly index \cite{repo_preprocess_features}. The resulting capacity factors are
+\begin{equation}
+	\mathrm{CF}_{\mathrm{Solar},t} =
+	\frac{\mathrm{Solar\_MW}_t}{\mathrm{Solar\_Cap\_MW}_t},
+	\qquad
+	\mathrm{CF}_{\mathrm{Wind},t} =
+	\frac{\mathrm{Wind\_MW}_t}{\mathrm{Wind\_Cap\_MW}_t}.
+	\label{eq:capacity_factors}
+\end{equation}
+In the current implementation, both values are clipped to the interval $[0, 1.25]$ to suppress clearly implausible numerical extremes while still allowing limited over-capacity values that may arise from reporting inconsistencies or short-lived operational effects \cite{repo_preprocess_features}.
+
+The use of capacity factors has several methodological advantages. First, it normalizes renewable output by the generation base available in a given year, which is especially important when installed capacity changes over time. Second, it makes the modeling problem more stable across years by reducing scale drift. Third, it yields quantities that are physically interpretable and directly relevant to anomaly analysis. A drop in solar generation may not be meaningful in MW terms alone, but a drop in solar \emph{capacity factor} under strong radiation conditions is much more informative.
+
+This also emphasizes that the target space of the forecasting model includes both renewable capacity factors and operational variables such as load and price. Thus, the feature-engineering pipeline is aligned with the broader thesis philosophy: renewable behaviour should be modeled in a normalized weather-aware form rather than as raw production magnitude alone \cite{abeysekara2025report}.
+
+\subsection{Meteorological Variables and Derived Physical Proxies}
+
+Beyond calendar context and capacity normalization, the preprocessing script introduces a set of physically motivated weather-derived features. The purpose is not to create a perfect physical simulation, but to expose variables that better explain expected generation and demand dynamics.
+
+\paragraph{Air density.}
+The repository computes a derived air-density feature from temperature, pressure, and humidity. In simplified notation,
+\begin{equation}
+	\rho_{\mathrm{air},t} =
+	\frac{p_t}{287.05 \, T_t \left(1 + 0.61 q_t\right)},
+	\label{eq:air_density}
+\end{equation}
+where $p_t$ is pressure, $T_t$ is absolute temperature, and $q_t$ is specific humidity derived from relative humidity and vapor pressure relations \cite{repo_preprocess_features}. This quantity is particularly relevant for wind-power modeling because air density influences the energy content of moving air.
+
+\paragraph{Wind speed at 100\,m.}
+The raw dataset provides 10\,m wind speed, but utility-scale wind turbines operate at greater hub heights. The script therefore constructs an approximate 100\,m wind speed through a power-law profile:
+\begin{equation}
+	v_{100,t} = v_{10,t}\left(\frac{100}{10}\right)^{0.143},
+	\label{eq:wind100}
+\end{equation}
+where the exponent $0.143$ corresponds to a standard shear approximation in neutral conditions. This transformed variable is more suitable than raw 10\,m wind speed for explaining wind generation behaviour.
+
+\paragraph{Photovoltaic proxy.}
+To capture the influence of radiation and temperature on solar output, the script computes a simple PV proxy:
+\begin{equation}
+	\mathrm{PVProxy}_t =
+	\max\!\left(0,\ \mathrm{SW}_t \cdot \left[1 - 0.005\max(T_t - 25, 0)\right]\right),
+	\label{eq:pv_proxy}
+\end{equation}
+where $\mathrm{SW}_t$ is shortwave radiation and $T_t$ is temperature in Celsius. This feature reflects the intuition that solar output is positively driven by radiation but may be penalized by excessive module temperature.
+
+\paragraph{Wind power proxy.}
+The script also constructs a wind-power proxy proportional to air density and cubic wind speed:
+\begin{equation}
+	\mathrm{WindProxy}_t \propto \rho_{\mathrm{air},t}\, v_{100,t}^{3}.
+	\label{eq:wind_proxy}
+\end{equation}
+This is not a turbine-curve model, but it provides a physics-inspired explanatory variable that helps the forecaster distinguish weather-driven wind variation from potentially anomalous deviations.
+
+These engineered proxies are particularly important in a thesis concerned with both accuracy and interpretability. They serve as middle-ground features: richer than raw weather measurements, but still understandable in domain terms. They also contribute to the symbolic layer indirectly, because variables such as shortwave radiation and wind behaviour later become part of the ASP fact-generation process and veto rules.
+
+\subsection{Interaction Between Feature Engineering and Anomaly Detection}
+
+A strong methodology chapter should not treat feature engineering as an isolated preprocessing step. In this framework, engineered features directly shape how anomalies are later defined and interpreted.
+
+First, feature engineering affects the \emph{forecast baseline}. The dCeNN--ELM forecaster can only learn what is representable in its inputs. If weather and holiday context are absent, the model is forced to explain context-sensitive variation as noise. This would inflate residuals and produce avoidable false positives.
+
+Second, feature engineering affects \emph{threshold calibration}. Because residual distributions depend on the quality of the forecast baseline, better contextual inputs lead to more meaningful validation residuals and therefore to more credible calibrated thresholds.
+
+Third, feature engineering affects the \emph{symbolic component}. Holiday indicators, shortwave radiation, wind generation context, and load references are later transformed into ASP facts. Thus, the feature-engineering layer is also the upstream source of several symbolic reasoning variables. In that sense, it is one of the strongest points of integration between the neural and symbolic halves of the framework.
+
+\subsection{Feature Families in the Engineered Dataset}
+
+Table~\ref{tab:feature_families_ch52} summarizes the major feature families generated by the current pipeline.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Main feature families in \texttt{AT\_engineered\_hourly.csv}.}
+	\label{tab:feature_families_ch52}
+	\small
+	\begin{tabular}{|p{3.0cm}|p{5.2cm}|p{3.3cm}|}
+		\hline
+		\textbf{Feature family} & \textbf{Representative variables} & \textbf{Primary modeling purpose} \\
+		\hline
+		Operational variables & \texttt{Solar\_MW}, \texttt{Wind\_MW}, \texttt{Price\_EUR\_MWh}, load-related variables & Represent observed market and grid state \\
+		\hline
+		Installed-capacity variables & \texttt{Solar\_Cap\_MW}, \texttt{Wind\_Cap\_MW} & Normalize renewable output and support inter-year consistency \\
+		\hline
+		Capacity factors & \texttt{CF\_Solar}, \texttt{CF\_Wind} & Capture renewable behaviour in a normalized form \\
+		\hline
+		Calendar encodings & \texttt{hour\_sin}, \texttt{hour\_cos}, \texttt{dow\_sin}, \texttt{month\_cos} & Encode periodic structure without discontinuity \\
+		\hline
+		Special-day indicators & \texttt{is\_public\_holiday}, \texttt{is\_weekend}, \texttt{is\_special\_day} & Represent context shifts tied to holiday and weekend regimes \\
+		\hline
+		Meteorological variables & temperature, humidity, pressure, 10\,m wind speed, shortwave radiation & Provide exogenous weather drivers \\
+		\hline
+		Derived physical proxies & \texttt{air\_density\_kgm3}, \texttt{wind\_speed\_100m}, \texttt{pv\_proxy}, \texttt{wind\_power\_proxy} & Inject physically meaningful explanatory structure \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsection{Methodological Significance}
+
+The feature-engineering strategy of this thesis is deliberately conservative in one sense and ambitious in another. It is conservative because it does not attempt to create an excessively large or opaque feature space through arbitrary automated feature generation. It is ambitious because it incorporates domain structure explicitly: capacity normalization, physically motivated weather proxies, cyclical time encodings, and holiday-aware context. This combination is well suited to a forecasting-based anomaly pipeline whose success depends on representing normal behaviour as accurately and as meaningfully as possible.
+
+In summary, the engineered feature space is the first place where the thesis operationalizes its broader methodological claim: anomaly detection in weather-driven electricity systems should be \emph{contextualized before it is optimized}. Holiday flags, weather-derived capacity factors, and physical proxies do not merely enrich the input matrix; they define the conditions under which deviations should or should not be interpreted as anomalous. The following sections build on this foundation when justifying baselines and evaluation criteria.
+
+
+\section{Baseline Selection}
+\label{sec:baseline_selection}
+
+A rigorous experimental study requires baselines that are not only conventional in the literature, but also methodologically meaningful with respect to the contribution being claimed. In the present thesis, the proposed dCeNN--ELM architecture is not evaluated in isolation. It is explicitly compared against two benchmark families: a \emph{regularized linear model} in the form of Ridge Regression, and a \emph{deep sequential model} in the form of an LSTM baseline. This choice is deliberate. Together, the two baselines span a useful spectrum of modeling assumptions: Ridge Regression represents the strongest simple linear comparator on the engineered feature matrix, while LSTM represents a standard nonlinear sequential deep-learning baseline. The proposed model is positioned between these extremes: more expressive than a linear regressor, but more lightweight and deployment-conscious than a conventional recurrent network \cite{abeysekara2025report}.
+
+The implementation approach defines the fairness protocol clearly: all models must use the same chronological splits, the same engineered feature foundation, the same leakage-safe preprocessing logic, and the same evaluation in original target units wherever relevant. In this way, baseline selection is not treated as an afterthought, but as an integral part of the scientific design \cite{abeysekara2025report}. The goal of the comparison is not merely to show that one model attains lower error than another. It is to determine whether the proposed neural backbone provides a credible trade-off among predictive quality, efficiency, edge-readiness, and downstream anomaly usefulness.
+
+\subsection{Why Baselines Matter in This Thesis}
+
+The thesis claims that the dCeNN--ELM forecasting core is a useful foundation for a hybrid anomaly-detection system because it is:
+\begin{itemize}
+	\item expressive enough to model multivariate market--grid dynamics under weather uncertainty,
+	\item lightweight enough to remain CPU-friendly and edge-aware,
+	\item modular enough to integrate naturally with calibrated residual detection and ASP refinement.
+\end{itemize}
+Such claims cannot be justified without benchmark comparators. A linear model is needed to test whether the learned latent representation actually provides nonlinear value beyond regularized direct regression. A recurrent deep model is needed to test whether the proposed architecture remains competitive against a widely accepted sequential learner. The baseline choices are therefore directly tied to the research questions of the thesis rather than selected for convenience.
+
+Methodologically, the benchmark set is also intentionally minimal rather than exhaustive. The purpose is not to compare against every anomaly-detection or forecasting architecture in the literature. Instead, the experiment is designed to compare against two representative anchors:
+\begin{enumerate}
+	\item a \textbf{simple but strong linear baseline};
+	\item a \textbf{standard deep sequential baseline}.
+\end{enumerate}
+If the proposed model cannot outperform or at least meaningfully complement these reference points, then its methodological value would be difficult to defend.
+
+\subsection{Baseline A: Ridge Regression as the Linear Reference Model}
+
+Ridge Regression is selected as the principal linear baseline because it is both strong and interpretable. In contrast to an unregularized least-squares regressor, Ridge controls coefficient magnitude and mitigates instability under correlated predictors, which is especially relevant in the engineered feature space used in this thesis, where weather variables, lagged variables, and rolling summaries may exhibit multicollinearity \cite{hoerl1970ridge}.
+
+Let the supervised feature matrix be $X \in \mathbb{R}^{N \times d}$ and the multivariate target matrix be $Y \in \mathbb{R}^{N \times m}$. Ridge Regression estimates a weight matrix $W \in \mathbb{R}^{d \times m}$ by solving
+\begin{equation}
+	W = \arg\min_{W}
+	\left\{
+	\|Y - XW\|_F^2 + \lambda \|W\|_F^2
+	\right\},
+	\label{eq:ridge_objective}
+\end{equation}
+where $\lambda > 0$ is the regularization parameter. The corresponding closed-form solution is
+\begin{equation}
+	W = (X^{\top}X + \lambda I)^{-1}X^{\top}Y.
+	\label{eq:ridge_closed_form}
+\end{equation}
+This estimator is computationally cheap, easy to reproduce, and provides a strong reference point for tabular supervised learning.
+
+Its inclusion in this thesis is methodologically justified for three reasons.
+
+First, Ridge Regression tests whether the proposed dCeNN encoder actually contributes meaningful \emph{nonlinear representation value}. If the engineered feature matrix alone is sufficient for a linear model to match the proposed architecture, then the added complexity of the dCeNN latent layer would be difficult to justify.
+
+Second, Ridge Regression is well aligned with the forecasting-based framing of the thesis. It operates on the same supervised feature matrix as the proposed model, which means that the comparison isolates the benefit of latent representation learning rather than conflating it with differences in data access.
+
+Third, Ridge is computationally lightweight, which makes it an appropriate benchmark for the edge-efficiency narrative of the thesis. It serves as the lower-complexity anchor in the comparison space: if the proposed model is only marginally better than Ridge while being much more expensive, its practical merit becomes questionable. Conversely, if it offers clear forecasting or anomaly-relevance advantages while staying relatively lightweight, the case for the proposed architecture becomes stronger.
+
+The implementation explicitly describes Ridge Regression as ``Baseline A'' and frames it as a test of whether the dCeNN encoder provides meaningful nonlinear benefit beyond a strong regularized linear fit \cite{abeysekara2025report}. This is precisely the right role for Ridge in the current study.
+
+\subsection{Baseline B: LSTM as the Sequential Deep-Learning Reference Model}
+
+The second baseline is a Long Short-Term Memory network (LSTM), which is a standard recurrent architecture for sequence modeling and remains a widely recognized comparator in multivariate time-series forecasting and anomaly-detection pipelines \cite{hochreiter1997long}. The repository includes a dedicated benchmark script, \texttt{src/13\_benchmark\_lstm.py}, that trains a two-layer LSTM with a fixed lookback window of $24$, hidden size $64$, dropout $0.2$, and $30$ training epochs using Adam optimization \cite{repo_lstm_benchmark}. In contrast to the dCeNN--ELM model, the LSTM is trained iteratively by gradient descent on sliding windows of past observations.
+
+At a high level, the LSTM baseline receives a sequence
+\begin{equation}
+	\mathbf{X}_{t-L+1:t} = \{\mathbf{x}_{t-L+1}, \dots, \mathbf{x}_{t}\},
+	\label{eq:lstm_sequence}
+\end{equation}
+and updates its hidden and cell states through gated recurrence:
+\begin{align}
+	\mathbf{i}_t &= \sigma(W_i \mathbf{x}_t + U_i \mathbf{h}_{t-1} + \mathbf{b}_i), \\
+	\mathbf{f}_t &= \sigma(W_f \mathbf{x}_t + U_f \mathbf{h}_{t-1} + \mathbf{b}_f), \\
+	\mathbf{o}_t &= \sigma(W_o \mathbf{x}_t + U_o \mathbf{h}_{t-1} + \mathbf{b}_o), \\
+	\tilde{\mathbf{c}}_t &= \tanh(W_c \mathbf{x}_t + U_c \mathbf{h}_{t-1} + \mathbf{b}_c), \\
+	\mathbf{c}_t &= \mathbf{f}_t \odot \mathbf{c}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{c}}_t, \\
+	\mathbf{h}_t &= \mathbf{o}_t \odot \tanh(\mathbf{c}_t).
+	\label{eq:lstm_baseline}
+\end{align}
+The final hidden state is then mapped to a multivariate output through a fully connected layer.
+
+The use of an LSTM baseline is justified for several reasons.
+
+First, it is a \emph{standard deep sequential comparator}. Because the thesis argues that the proposed architecture is a strong alternative to heavier deep models in an anomaly-detection pipeline, it is necessary to compare against an established sequential neural model rather than only against linear baselines.
+
+Second, the LSTM baseline makes the efficiency argument meaningful. If the proposed dCeNN--ELM model can deliver competitive forecasting quality while training faster, inferring more cheaply, or requiring fewer deployment resources than the LSTM, then the thesis claim of ``lightweight but effective'' becomes empirically credible.
+
+Third, the LSTM baseline respects the literature surveyed earlier in Chapter~3, where recurrent architectures were identified as one of the dominant deep-learning families for time-series anomaly detection and forecasting. Its inclusion therefore creates continuity between the literature review and the experimental design.
+
+The repository implementation also handles an important fairness detail: the LSTM scales the targets during training to stabilize optimization and inverse-transforms them for final reporting, ensuring that all comparisons remain in the original physical units of MW and EUR/MWh \cite{repo_lstm_benchmark,abeysekara2025report}. This is a sound experimental choice because it prevents the comparison from being distorted by training-scale artifacts.
+
+\subsection{Why These Two Baselines Are Complementary}
+
+Ridge Regression and LSTM are not arbitrary benchmark choices. Together, they define a conceptually useful comparison triangle with the proposed dCeNN--ELM model:
+\begin{itemize}
+	\item \textbf{Ridge Regression} tests whether linear structure on engineered features is already sufficient;
+	\item \textbf{LSTM} tests whether a standard deep sequential model offers superior temporal modeling despite greater computational cost;
+	\item \textbf{dCeNN--ELM} is expected to occupy the middle ground by combining nonlinear representation learning with efficient analytical output fitting.
+\end{itemize}
+
+This relationship is summarized in Table~\ref{tab:baseline_roles}.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Conceptual roles of the selected benchmark models.}
+	\label{tab:baseline_roles}
+	\small
+	\begin{tabular}{|p{2.8cm}|p{4.0cm}|p{4.0cm}|}
+		\hline
+		\textbf{Model} & \textbf{What it represents} & \textbf{Why it is included} \\
+		\hline
+		Ridge Regression & Regularized linear forecasting on the engineered feature matrix & Tests whether nonlinear latent encoding adds value beyond a strong linear fit \\
+		\hline
+		LSTM & Standard deep sequential forecasting with sliding-window temporal context & Tests whether the proposed model remains competitive against a common recurrent deep baseline \\
+		\hline
+		dCeNN--ELM & Lightweight nonlinear encoder + analytical ridge head & Evaluates whether latent efficiency and structured forecasting provide a favorable trade-off \\
+		\hline
+	\end{tabular}
+\end{table}
+
+The strength of this baseline set lies in its interpretability. If the proposed model outperforms Ridge but remains much lighter than LSTM, then the claimed contribution is clear. If it matches or exceeds LSTM while preserving efficiency and modularity, then the contribution is even stronger. In contrast, a larger but less principled baseline zoo might create noisy comparisons without strengthening the core argument.
+
+\subsection{Fair Comparison Protocol}
+
+Baseline selection is inseparable from fairness protocol. The implementation emphasizes that all models are compared under the same experimental conditions \cite{abeysekara2025report}. These conditions are central to the validity of the results:
+\begin{enumerate}
+	\item \textbf{Same chronological splits.} All models use the same train, validation, and test periods.
+	\item \textbf{Same engineered feature foundation.} The preprocessing stage builds a common supervised dataset artifact used across benchmarks.
+	\item \textbf{Same leakage-safe scaling rules.} Feature scaling is fit only on training data and reused downstream.
+	\item \textbf{Same evaluation units.} Final reported performance is interpreted in original physical units after any internal scaling required for optimization.
+	\item \textbf{Same edge-oriented benchmarking conditions.} Latency and efficiency comparisons are run on CPU to reflect the edge-readiness goals of the thesis.
+\end{enumerate}
+
+This design is methodologically important because it ensures that the comparison is about \emph{modeling assumptions}, not about differences in preprocessing, leakage, or evaluation protocol. In particular, the common supervised feature artifact means that all models benefit equally from the same engineered covariates and contextual information. The comparison therefore isolates the value of the latent dCeNN encoder and the analytical ELM head.
+
+\subsection{Why Other Baselines Are Not the Primary Focus}
+
+Given the broad anomaly-detection literature reviewed in Chapter~3, one might ask why the benchmark set does not include a larger array of models such as Transformers, convolutional autoencoders, or probabilistic sequence models. The answer is methodological focus. The thesis is not presented as an exhaustive leaderboard study across the full space of modern time-series models. Instead, it is a targeted experimental design aimed at answering a more specific question: \emph{does the proposed dCeNN--ELM forecasting core provide a practically useful middle ground between linear simplicity and deep sequential complexity?}
+
+Within that framing, Ridge and LSTM are sufficient and well chosen. Ridge anchors the low-complexity end of the spectrum, while LSTM anchors the standard deep sequential end. The addition of many more baselines might increase breadth, but it would not necessarily improve the interpretability of the experimental conclusions. In this thesis, a smaller but methodologically coherent benchmark set is stronger than a larger but less principled one.
+
+\subsection{Methodological Significance}
+
+The baseline design of this thesis directly supports the broader contribution claim. Ridge Regression provides the simplest credible test of whether engineered features alone can carry the forecasting task. LSTM provides a well-established sequential neural comparator. The proposed dCeNN--ELM model is then evaluated not only against their forecasting performance, but also against their computational and deployment characteristics.
+
+This makes the baseline section more than a procedural requirement. It is where the thesis turns its conceptual claims into falsifiable experimental questions. If the proposed method does not provide clear benefit over Ridge, its nonlinear latent representation is questionable. If it cannot compete reasonably with LSTM, its claim to be an effective lightweight alternative weakens. If, however, it occupies the intended middle ground stronger than linear regression, lighter than recurrent deep models, and well suited to later symbolic refinement then the baseline comparison becomes strong evidence for the methodological value of the framework.
+
+
+\section{Evaluation Metrics}
+\label{sec:evaluation_metrics}
+
+The evaluation strategy adopted in this thesis is designed to reflect the actual purpose of the proposed framework. The goal is not only to produce a statistically accurate forecaster, but to generate anomaly signals that are plausible, interpretable, and useful for downstream decision support. For this reason, evaluation is intentionally multi-layered. It assesses: 
+\begin{enumerate}
+	\item \textbf{forecasting quality}, to determine how well the neural backbone models normal multivariate behaviour;
+	\item \textbf{anomaly and event behaviour}, to characterize the statistical detector in the absence of definitive anomaly labels;
+	\item \textbf{symbolic refinement effects}, to quantify how the ASP layer changes the anomaly set;
+	\item \textbf{financial utility}, to evaluate whether refined anomaly signals lead to more useful downstream decisions.
+\end{enumerate}
+
+This design moves beyond a narrow dependence on classification-style measures such as F1-score. In the present Austrian electricity dataset, there is no authoritative ground-truth anomaly annotation for each timestamp. Consequently, classical supervised anomaly metrics are not sufficient as the primary evaluation basis. Instead, the framework adopts a label-light, behaviour-oriented, and utility-aware evaluation stance, which is consistent with the repository implementation \cite{abeysekara2025report,repo_finance_backtest_ch54,repo_utility_plot_ch54}. In this sense, the question is not merely whether the model flags unusual points, but whether those flags correspond to coherent events, survive symbolic scrutiny, and improve downstream utility.
+
+\subsection{Why F1-Score Alone Is Inadequate}
+
+In many anomaly-detection papers, model comparison is reduced to precision, recall, and F1-score against a labeled anomaly set. Such metrics are appropriate only when the target labels are reliable and sufficiently comprehensive. In electricity markets and grid operations, however, definitive anomaly labels are often unavailable, incomplete, or contestable. A large price spike may be unusual, but whether it should be called an anomaly depends on context. A solar shortfall may be operationally suspicious under one weather regime and entirely expected under another. This makes label-based evaluation incomplete even when partial annotations exist \cite{chandola2009anomaly,blazquez2021review}.
+
+For this reason, the present thesis does not discard F1-like thinking, but it does not elevate it to the dominant metric either. Instead, the evaluation strategy is built around four ideas:
+\begin{itemize}
+	\item prediction quality should be measured directly through regression metrics;
+	\item anomaly behaviour should be examined through point-level and event-level summaries;
+	\item symbolic refinement should be assessed through veto and retention analysis;
+	\item practical usefulness should be assessed through a finance-aware utility proxy.
+\end{itemize}
+This is a more defensible evaluation philosophy for a neuro-symbolic anomaly pipeline operating on weakly labeled real-world data.
+
+\subsection{Forecasting Metrics}
+
+Because the anomaly detector is forecasting-based, the first layer of evaluation concerns predictive quality. Let $y_t$ denote the true target value and $\hat{y}_t$ the corresponding forecast. For a set of $N$ observations, the following standard regression metrics are used.
+
+\paragraph{Root Mean Squared Error (RMSE).}
+\begin{equation}
+	\mathrm{RMSE} =
+	\sqrt{
+		\frac{1}{N}\sum_{t=1}^{N}(y_t - \hat{y}_t)^2
+	}.
+	\label{eq:rmse_ch54}
+\end{equation}
+RMSE penalizes large errors more strongly than MAE and is therefore useful when large misses are operationally important.
+
+\paragraph{Mean Absolute Error (MAE).}
+\begin{equation}
+	\mathrm{MAE} =
+	\frac{1}{N}\sum_{t=1}^{N}\lvert y_t - \hat{y}_t \rvert.
+	\label{eq:mae_ch54}
+\end{equation}
+MAE provides an easily interpretable average deviation and is less sensitive to extreme outliers than RMSE.
+
+\paragraph{Mean Absolute Percentage Error (MAPE).}
+\begin{equation}
+	\mathrm{MAPE} =
+	\frac{100}{N}\sum_{t=1}^{N}
+	\left|
+	\frac{y_t - \hat{y}_t}{y_t}
+	\right|.
+	\label{eq:mape_ch54}
+\end{equation}
+In implementation, MAPE is interpreted carefully and should exclude timestamps where the true value is zero, thereby avoiding division-by-zero distortions.
+
+\paragraph{Coefficient of Determination ($R^2$).}
+\begin{equation}
+	R^2 =
+	1 -
+	\frac{\sum_{t=1}^{N}(y_t - \hat{y}_t)^2}
+	{\sum_{t=1}^{N}(y_t - \bar{y})^2}.
+	\label{eq:r2_ch54}
+\end{equation}
+This metric summarizes the explanatory quality of the forecasts relative to a mean baseline.
+
+Within the thesis, these metrics are reported globally and, where useful, by month or by target. This is important because performance in weather-driven electricity data is not temporally uniform. A model that appears strong in aggregate may degrade materially in specific seasons or operating regimes. Thus, forecasting metrics are necessary but not sufficient: they establish whether the neural backbone has learned normal behaviour well enough to support residual-based anomaly detection.
+
+\subsection{Point-Level and Event-Level Anomaly Metrics}
+
+After forecasting and thresholding, the next layer of evaluation concerns anomaly behaviour. Since the detector outputs target-wise binary flags and severity scores rather than supervised labels, the emphasis shifts from classification metrics to descriptive and structural anomaly summaries.
+
+\paragraph{Point-level anomaly counts.}
+For each target $j$, the total number of timestamps flagged anomalous can be written as
+\begin{equation}
+	N^{(j)}_{\mathrm{anom}} =
+	\sum_{t=1}^{T} a_t^{(j)},
+	\label{eq:anom_count}
+\end{equation}
+where $a_t^{(j)} \in \{0,1\}$ is the target-wise anomaly flag. These counts are useful for understanding the detector’s aggressiveness and the relative difficulty of different targets.
+
+\paragraph{Multi-target involvement.}
+Because the framework is multivariate, one also tracks how many targets are simultaneously anomalous at each time step:
+\begin{equation}
+	n_t =
+	\sum_{j=1}^{m} a_t^{(j)}.
+	\label{eq:multi_target_count}
+\end{equation}
+This distinguishes isolated univariate events from broader multivariate disturbances.
+
+\paragraph{Combined anomaly severity.}
+The repository already computes a combined exceedance score that aggregates target-wise residual exceedance. This gives a graded severity value rather than a purely binary decision. Such scores are important because two anomaly timestamps may both be flagged while differing substantially in intensity.
+
+\paragraph{Event-level metrics.}
+Point anomalies are aggregated into contiguous runs to form anomaly events. If an event $E_k$ occupies a consecutive set of timestamps, then several event properties become meaningful:
+\begin{align}
+	\mathrm{duration}(E_k) &= |E_k|, \\
+	\mathrm{peak}(E_k) &= \max_{t \in E_k} s_t, \\
+	\mathrm{mean}(E_k) &= \frac{1}{|E_k|}\sum_{t \in E_k} s_t,
+\end{align}
+where $s_t$ is the anomaly severity score. Event-level metrics are especially appropriate in this thesis because many practically important anomalies are collective rather than purely pointwise. A good anomaly detector should therefore produce events that are behaviourally coherent, not random spikes scattered across the timeline.
+
+\subsection{Veto Analysis as a Core Neuro-Symbolic Metric}
+
+A distinctive feature of the present thesis is that anomaly evaluation does not stop at the raw statistical detector. The ASP layer modifies the anomaly set, and this modification must itself be evaluated. This is the purpose of \emph{veto analysis}.
+
+Let $N_{\mathrm{raw}}^{(j)}$ denote the number of raw anomaly candidates for target $j$, and let $N_{\mathrm{valid}}^{(j)}$ denote the number that survive ASP refinement. Then the number of vetoed anomalies is
+\begin{equation}
+	N_{\mathrm{veto}}^{(j)} =
+	N_{\mathrm{raw}}^{(j)} - N_{\mathrm{valid}}^{(j)}.
+	\label{eq:veto_count}
+\end{equation}
+From this, one may define the \emph{veto rate}
+\begin{equation}
+	\mathrm{VR}^{(j)} =
+	\frac{N_{\mathrm{veto}}^{(j)}}{N_{\mathrm{raw}}^{(j)}},
+	\label{eq:veto_rate}
+\end{equation}
+and the complementary \emph{retention rate}
+\begin{equation}
+	\mathrm{RR}^{(j)} =
+	\frac{N_{\mathrm{valid}}^{(j)}}{N_{\mathrm{raw}}^{(j)}}.
+	\label{eq:retention_rate}
+\end{equation}
+
+These metrics are highly informative because they quantify how strongly the symbolic layer reshapes the anomaly set. A high veto rate does not automatically mean the symbolic layer is too aggressive; it may indicate that the raw detector is over-sensitive in particular contexts. Conversely, an extremely low veto rate may indicate that the symbolic rule base is too permissive or insufficiently informative.
+
+A more detailed veto analysis also examines \emph{veto reasons}. Suppose that $r \in \mathcal{R}$ indexes the set of symbolic veto categories, such as holiday suppression, invalid solar anomalies, or excessive wind ramp conditions. Then the relative share of each veto reason is
+\begin{equation}
+	P(r) =
+	\frac{N_{\mathrm{veto},r}}{\sum_{r' \in \mathcal{R}} N_{\mathrm{veto},r'}}.
+	\label{eq:veto_reason_share}
+\end{equation}
+This helps identify whether the symbolic layer is mainly filtering holiday effects, night-time solar inconsistencies, wind-ramp artifacts, or some other recurring anomaly class. Such a breakdown is methodologically valuable because it reveals not only how much the ASP layer changes the anomaly set, but \emph{why} it does so.
+
+In this thesis, veto analysis is therefore not a secondary reporting add-on. It is one of the principal metrics through which the symbolic value of the framework is demonstrated.
+
+\subsection{Financial Utility as a Decision-Oriented Metric}
+
+The final and most distinctive evaluation layer concerns \emph{financial utility}. The repository includes a finance-aware backtesting module that maps detected anomalies to simple policy actions and computes a cumulative utility trajectory rather than stopping at anomaly counts alone \cite{repo_finance_backtest_ch54}. This is one of the strongest methodological steps in the thesis because it makes evaluation decision-oriented rather than merely descriptive.
+
+At a high level, let $a_t$ denote the action taken at time $t$, $s_t$ the anomaly score, and $\ell_t$ the penalty associated with a poor directional or imbalance decision. Then utility can be expressed abstractly as
+\begin{equation}
+	U =
+	\sum_{t=1}^{T}
+	\left[
+	g(a_t, \Delta p_t)
+	+ \beta s_t
+	- \ell_t
+	\right],
+	\label{eq:utility_general}
+\end{equation}
+where $g(\cdot)$ represents action-dependent gain based on price movement, $\beta$ is the anomaly bonus weight, and $\ell_t$ is the penalty term. In the implemented backtest, the decision policy is activated by anomaly-confirmed price conditions, incorporates an anomaly bonus weighted by the combined score, and subtracts an imbalance penalty when the predicted direction conflicts with the realized direction \cite{repo_finance_backtest_ch54}.
+
+The resulting evaluation includes:
+\begin{itemize}
+	\item \textbf{instantaneous utility}, measuring per-timestep contribution;
+	\item \textbf{cumulative utility}, measuring the aggregate strategy effect through time;
+	\item \textbf{total penalties}, measuring the degree of poor directional behaviour or excessive risk;
+	\item \textbf{net utility comparison}, measuring whether the neuro-symbolic strategy improves over the purely neural baseline.
+\end{itemize}
+
+The comparison script in the repository explicitly contrasts a purely neural strategy against the neuro-symbolic refined strategy and visualizes the difference in cumulative utility and penalty reduction \cite{repo_utility_plot_ch54}. This makes utility not just a conceptual metric, but a direct empirical comparison axis.
+
+From the perspective of the thesis, financial utility is not meant to claim a production-ready trading system. Rather, it serves as a \emph{downstream usefulness proxy}. It answers a more practical question than F1-score: does the anomaly detector produce signals that are more useful after symbolic refinement than before?
+
+\subsection{Evaluation Without Ground-Truth Anomaly Labels}
+
+A strong evaluation section should state clearly how it handles the absence of definitive anomaly labels. In this work, anomaly assessment is treated as \emph{label-light} rather than strictly supervised. Accordingly, the defensibility of the anomaly detector is established through three complementary criteria:
+\begin{enumerate}
+	\item \textbf{behavioural consistency:} anomalies should form coherent point and event patterns rather than random noise;
+	\item \textbf{plausibility under symbolic constraints:} anomalies should survive the ASP veto only when they remain credible in domain terms;
+	\item \textbf{utility relevance:} refined anomalies should produce better downstream utility characteristics than raw neural flags alone.
+\end{enumerate}
+This stance is more appropriate than forcing all evaluation into a supervised classification template that the data do not genuinely support.
+
+\begin{table}[H]
+	\centering
+	\caption{Evaluation layers used in the thesis.}
+	\label{tab:evaluation_layers}
+	\small
+	\begin{tabular}{|p{3.5cm}|p{4.5cm}|p{6.5cm}|}
+		\hline
+		\textbf{Evaluation layer} & \textbf{Representative metrics} & \textbf{Purpose} \\
+		\hline
+		Forecasting quality & RMSE, MAE, MAPE, $R^2$ & Measures how well the neural component models normal behaviour \\
+		\hline
+		Point-level anomaly behaviour & anomaly counts, multi-target involvement, combined score & Characterizes statistical anomaly output without requiring labels \\
+		\hline
+		Event-level anomaly behaviour & event count, duration, peak score, mean score & Evaluates collective-anomaly coherence and persistence \\
+		\hline
+		Symbolic refinement impact & veto count, veto rate, retention rate, veto-reason distribution & Quantifies the effect of ASP on anomaly plausibility and false-positive suppression \\
+		\hline
+		Decision-oriented usefulness & instantaneous utility, cumulative utility, total penalties, neural vs neuro-symbolic comparison & Measures downstream practical value of refined anomaly signals \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsection{Methodological Significance}
+
+The evaluation strategy of this thesis is intentionally broader than the standard anomaly-detection template. Forecasting metrics are needed because the detector is built on residual quality. Point and event metrics are needed because anomaly behaviour is inherently temporal and multivariate. Veto analysis is needed because the symbolic layer is not decorative; it materially changes the anomaly set. Financial utility is needed because the project claims not only improved interpretability, but also improved practical relevance.
+
+Taken together, these metrics make the experimental design consistent with the core thesis argument: useful anomaly detection in weather-driven electricity systems should be judged not only by whether it detects unusual behaviour, but by whether it does so in a way that is statistically sound, symbolically plausible, and operationally valuable.

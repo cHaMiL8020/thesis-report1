@@ -1,0 +1,203 @@
+This chapter presents the theoretical foundations of the proposed neuro-symbolic anomaly detection framework. The overall architecture rests on four complementary pillars: 	{(i)} a structured neural representation learner based on a discrete Cellular Neural Network (dCeNN) principle, 	{(ii)} an Extreme Learning Machine (ELM)-style analytical prediction layer, 	{(iii)} Answer Set Programming (ASP) for declarative post-hoc reasoning under explicit domain constraints, and 	{(iv)} conformal-style residual calibration for uncertainty-aware thresholding. Together, these components form a pipeline in which statistical learning is used to model normal multivariate dynamics, while symbolic reasoning is used to filter, validate, and explain anomaly candidates. This combination is particularly suitable for electricity market and grid data, where the notion of abnormality is contextual, weakly labelled, and constrained by both physical and market logic.
+
+
+\section{Discrete Cellular Neural Networks (dCeNN)}
+
+Cellular Neural Networks (CeNNs), originally introduced by Chua and Yang, are dynamical neural systems composed of locally interacting processing units called \emph{cells} \cite{chua1988cellular,chua2002cnnbook}. Unlike fully connected neural layers, a cellular architecture imposes a neighborhood structure: each cell updates its state primarily from a limited local receptive field rather than from all other cells. This local-connectivity principle is important because it introduces an inductive bias toward structured interaction, reduces parameter growth, and supports efficient computation. In classical image and signal-processing settings, such architectures are especially attractive for spatio-temporal data because nearby states often interact more strongly than distant ones \cite{chua2002cnnbook}.
+
+A generic discrete-time cellular state update can be written as
+\begin{equation}
+\mathbf{h}^{(k+1)} = \phi\!\left( A\mathbf{h}^{(k)} + B\mathbf{u}^{(k)} + \mathbf{b} \right),
+\label{eq:dcenn_general}
+\end{equation}
+where $\mathbf{u}^{(k)}$ is the input, $\mathbf{h}^{(k)}$ is the latent state at iteration $k$, $A$ captures cell-to-cell interactions, $B$ maps external input into the cellular state space, $\mathbf{b}$ is a bias term, and $\phi(\cdot)$ is a nonlinear activation. The defining property is not merely recurrence, but \emph{structured recurrence}: the interaction matrix $A$ is constrained so that only a local subset of cells influences each update. This differs from an unconstrained recurrent layer, where every latent unit can affect every other latent unit.
+
+In the present thesis, the dCeNN principle is implemented in a lightweight latent encoder rather than in a full two-dimensional lattice. Let $\mathbf{x}_t \in \mathbb{R}^{d}$ denote the engineered feature vector at time $t$, constructed from contemporaneous signals, lagged values, rolling means, calendar encodings, and weather-derived proxies. The encoder first projects $\mathbf{x}_t$ into a latent representation,
+\begin{equation}
+\mathbf{h}_t^{(0)} = \tanh\!\left(W_{\mathrm{in}}\mathbf{x}_t + \mathbf{b}_{\mathrm{in}}\right),
+\label{eq:dcenn_proj}
+\end{equation}
+and then applies a small number of masked recurrent refinement steps,
+\begin{equation}
+\mathbf{h}_t^{(k+1)} = \tanh\!\left(\left(W_c \odot M\right)\mathbf{h}_t^{(k)} + \gamma\,\mathbf{h}_t^{(k)} + \mathbf{b}_c\right), \qquad k=0,\dots,S-1,
+\label{eq:dcenn_masked_update}
+\end{equation}
+where $W_c$ is the recurrent weight matrix, $M$ is a binary block-structured mask encoding local neighborhoods, $\odot$ denotes the Hadamard product, $\gamma$ is a residual self-feedback coefficient, and $S$ is the number of update steps. In the implemented system, locality is therefore realized by forcing latent interactions to remain inside small blocks rather than allowing unrestricted global mixing. The result is a structured latent dynamical layer that is inspired by discrete cellular computation while remaining compact enough for edge-oriented inference.
+
+This design is theoretically and practically attractive for three reasons. First, it introduces \emph{structured sparsity}. If the latent dimension is $p$, a fully connected recurrent layer requires $p^2$ interaction parameters, whereas a block-local architecture reduces the number of effective connections to the sum of the squared block sizes. This lowers both parameter count and arithmetic cost. Second, locality acts as a regularizer: the encoder is encouraged to form semantically related latent neighborhoods instead of relying on arbitrary global coupling. Third, iterative local refinement allows the representation to evolve over a small number of controlled steps, which is often sufficient to capture meaningful temporal interactions once lags and rolling summaries have already been included in the input features.
+
+Although CeNNs are often associated with explicit spatial grids, the underlying principle is more general. In this thesis, temporal structure is embedded into the feature vector through lagged and rolling descriptors, while the dCeNN captures higher-order interactions among these structured descriptors. Put differently, the model does not treat the engineered input as an unstructured tabular vector. Instead, it assumes that groups of related temporal and physical features should interact locally in latent space before being passed to the prediction head. This is well aligned with the needs of energy time series, where load, renewable generation, price, and weather variables interact strongly but not arbitrarily.
+
+The computational efficiency of this design also makes it suitable for low-resource environments. Lightweight neural architectures are central to TinyML and edge intelligence, where latency, memory, and power constraints are critical design requirements \cite{antonini2023tinyml}. The dCeNN used in this thesis follows the same philosophy: it seeks not maximal architectural complexity, but a disciplined balance between expressive power and deployment realism.
+
+\FloatBarrier
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{images/dCeNN_theory.png}
+	\caption{Conceptual architecture of the Tiny dCeNN encoder used in the proposed framework. Engineered multivariate temporal features are first projected into an initial latent state and then refined through masked local recurrent interactions. The fixed locality mask restricts communication to neighborhood-preserving connections, while blocked long-range edges enforce structured sparsity. After iterative refinement, the encoder produces a compact latent embedding that is passed to the downstream ELM-style ridge head for forecasting.}
+	\label{dCeNN_theory}
+\end{figure}
+\FloatBarrier   
+
+\section{Extreme Learning Machines (ELM)}
+
+Extreme Learning Machines were introduced as a fast-learning paradigm for single-hidden-layer feedforward networks \cite{huang2006extreme}. The central idea is that the hidden representation need not be learned by iterative backpropagation in the usual way. Instead, once the hidden-layer mapping is fixed, the output weights can be solved analytically as a linear least-squares problem. This yields very high training speed while retaining the universal approximation capability associated with sufficiently rich nonlinear hidden representations \cite{cybenko1989approximation,huang2006universal,huang2012elm_regression}.
+
+In canonical ELM, suppose a training set contains $N$ samples $\{(\mathbf{x}_i,\mathbf{y}_i)\}_{i=1}^{N}$, where $\mathbf{x}_i \in \mathbb{R}^{d}$ and $\mathbf{y}_i \in \mathbb{R}^{m}$. For a hidden layer with $L$ nonlinear nodes, the hidden representation matrix is
+\begin{equation}
+H =
+\begin{bmatrix}
+ g(\mathbf{a}_1^{\top}\mathbf{x}_1 + b_1) & \cdots & g(\mathbf{a}_L^{\top}\mathbf{x}_1 + b_L) \\
+ \vdots & \ddots & \vdots \\
+ g(\mathbf{a}_1^{\top}\mathbf{x}_N + b_1) & \cdots & g(\mathbf{a}_L^{\top}\mathbf{x}_N + b_L)
+\end{bmatrix},
+\label{eq:elm_hidden}
+\end{equation}
+where $g(\cdot)$ is a nonlinear activation, and $\mathbf{a}_\ell,b_\ell$ are the hidden-node parameters. In standard ELM these hidden parameters are randomly assigned and then kept fixed. The learning problem reduces to finding the output-weight matrix $\beta \in \mathbb{R}^{L \times m}$ such that
+\begin{equation}
+H\beta \approx Y,
+\end{equation}
+where $Y \in \mathbb{R}^{N \times m}$ stacks the target vectors.
+
+The unregularized least-squares solution is
+\begin{equation}
+\beta = H^{\dagger}Y,
+\label{eq:elm_pinv}
+\end{equation}
+where $H^{\dagger}$ denotes the Moore--Penrose pseudoinverse. In practice, ridge regularization is often preferred for numerical stability and generalization \cite{hoerl1970ridge,huang2012elm_regression}. The regularized solution becomes
+\begin{equation}
+\beta = \left(H^{\top}H + \lambda I\right)^{-1}H^{\top}Y,
+\label{eq:elm_ridge}
+\end{equation}
+where $\lambda > 0$ is the regularization parameter. Equation \eqref{eq:elm_ridge} is especially attractive in small and medium-sized problems because it avoids iterative gradient-based training of the output layer and gives a deterministic closed-form estimator.
+
+The significance of ELM is therefore twofold. First, it offers \emph{high-speed training}: once the hidden features are available, the output layer is fitted in one analytical step. Second, it inherits \emph{universal approximation} properties from the broader theory of single-hidden-layer networks, provided the activation is sufficiently expressive and the hidden representation is sufficiently rich \cite{cybenko1989approximation,huang2006universal}. In other words, ELM shifts the emphasis from repeated weight adjustment to the quality of the nonlinear feature map itself.
+
+The present thesis adopts the \emph{ELM principle} rather than a strictly classical random-hidden-layer ELM. Specifically, the hidden representation is not generated by random nodes alone; it is supplied by the dCeNN encoder described in Section 2.1. Let $\mathbf{h}_t \in \mathbb{R}^{p}$ denote the encoded latent representation of the feature vector $\mathbf{x}_t$. Stacking all encoded training samples yields a latent design matrix $H \in \mathbb{R}^{N \times p}$. The multivariate forecast targets are then obtained through
+\begin{equation}
+\hat{Y} = H W,
+\label{eq:elm_head}
+\end{equation}
+where $W \in \mathbb{R}^{p \times m}$ is learned using the ridge-regularized solution in \eqref{eq:elm_ridge}. Hence, the dCeNN performs representation learning, while the ELM-style head performs analytical prediction. This hybridization is important: it retains the training-speed advantage of ELM at the output stage while allowing the latent representation to be more structured and domain-adaptive than a purely random hidden layer.
+
+For multivariate energy forecasting, this choice is particularly suitable. The task requires simultaneous prediction of several correlated targets such as solar capacity factor, wind capacity factor, load, and price. Because the output layer is linear in the latent state, cross-target prediction remains computationally cheap, and all targets can be solved jointly in a single matrix equation. This supports rapid retraining, reproducibility, and compact deployment bundles, all of which are desirable for operational monitoring systems.
+
+\FloatBarrier
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{images/ELM_theory.png}
+	\caption{Conceptual illustration of the ELM-style ridge regression head used in the proposed framework. The compact latent representation produced by the Tiny dCeNN encoder is treated as a fixed hidden feature matrix, while the output weights are learned analytically through a ridge-regularized closed-form solution. This enables efficient multivariate forecasting without iterative output-layer backpropagation, and the resulting predictions are subsequently used to compute residuals for anomaly detection.}
+	\label{ELM_theory}
+\end{figure}
+\FloatBarrier
+
+\section{Answer Set Programming (ASP)}
+
+Answer Set Programming is a declarative problem-solving paradigm rooted in logic programming and non-monotonic reasoning \cite{gelfond1988stable,brewka2011asp,gebser2012answer}. In declarative programming, the modeler specifies \emph{what} must hold, rather than an explicit step-by-step procedure describing \emph{how} to compute it. This is especially useful when domain knowledge is naturally expressed as rules, defaults, exceptions, and constraints. In anomaly detection for energy systems, many important conditions have exactly this structure: a solar anomaly should be rejected if radiation is zero; an anomaly should be treated differently on public holidays; some events become credible only if they persist or co-occur with other signals.
+
+The formal semantics that underpins ASP is the \emph{stable model semantics} introduced by Gelfond and Lifschitz \cite{gelfond1988stable}. Under this semantics, a logic program can have one or more \emph{stable models} (also called \emph{answer sets}), each representing a self-consistent set of conclusions supported by the rules of the program. A modern ASP solver such as \texttt{clingo} takes a collection of facts and rules, grounds the symbolic program, and computes stable models efficiently \cite{gebser2019multi}. This makes ASP particularly attractive for rule-based post-processing in machine learning pipelines.
+
+A typical ASP rule has the form
+\begin{equation}
+\texttt{head} \leftarrow \texttt{body}_1,\ldots,\texttt{body}_k,\ \texttt{not}\ \texttt{body}_{k+1},\ldots,\texttt{not}\ \texttt{body}_{n},
+\label{eq:asp_rule_generic}
+\end{equation}
+which can be read as: the \texttt{head} is true if all positive body literals hold and no negated-by-failure body literal can be established. The operator \texttt{not} expresses default negation, allowing the program to reason with incomplete information. This ability to handle defaults and exceptions is essential in domains where rules are context-sensitive rather than absolute.
+
+In the present thesis, ASP is used as a symbolic refinement layer on top of the statistical anomaly detector. The machine-learning stage produces candidate anomalies and contextual facts; these are translated into ASP facts such as \texttt{anomaly(price,t)}, \texttt{holiday(t)}, or \texttt{pred(shortwave\_radiation,R,t)}. The rule base then decides which anomaly candidates are logically acceptable. Representative rules from the implemented framework can be summarized as follows:
+\begin{lstlisting}[style=asprules,caption={Representative ASP refinement rules.},label={lst:asp_rules}]
+persistent(G,T) <- anomaly(G,T), anomaly(G,T-1), anomaly(G,T-2).
+invalid_solar(T) <- anomaly(cf_solar,T), pred(shortwave_radiation,R,T), R <= 0.
+confirmed_economic_spike(T) <- anomaly(price,T), anomaly(load_mw,T).
+valid_anomaly(G,T) <- persistent(G,T), not holiday(T), not invalid_solar(T).
+valid_anomaly(price,T) <- confirmed_economic_spike(T), not holiday(T).
+\end{lstlisting}
+Listing~\ref{lst:asp_rules} shows representative ASP refinement rules used to validate or suppress statistical anomaly candidates.
+
+These rules express a simple but powerful idea: a statistical anomaly becomes a \emph{final} anomaly only if it survives domain-level scrutiny. In the implemented rule base, statistical detections may be vetoed because they occur on holidays, because solar anomalies are proposed when radiation is absent, or because wind-related behavior exceeds plausible ramp conditions. Conversely, some anomalies are strengthened when corroborated by co-anomalies, such as simultaneous price and load irregularities.
+
+This form of reasoning provides three major benefits. First, it improves \emph{precision} by filtering implausible anomaly candidates. Second, it improves \emph{interpretability}, because final decisions can be traced to explicit rules rather than to opaque latent computations alone. Third, it improves \emph{maintainability}: domain knowledge can be revised or extended simply by editing the rule base, without retraining the neural forecasting model. This modularity is one of the main reasons ASP fits naturally within neuro-symbolic system design.
+
+For electricity-market anomaly detection, ASP is especially valuable because the domain is governed by both physical regularities and market conventions. A purely data-driven detector may learn useful statistical patterns, but it cannot guarantee that its anomaly flags respect those external structures. ASP closes this gap by providing a rigorous symbolic layer in which such structures are stated explicitly and checked systematically.
+
+\section{Conformal Prediction \& Thresholding}
+
+After the dCeNN--ELM forecaster produces predictions, anomaly detection is based on the deviation between the observed and predicted targets. Let $y_t^{(j)}$ and $\hat{y}_t^{(j)}$ denote, respectively, the observed and predicted value of target $j$ at time $t$. The residual is
+\begin{equation}
+r_t^{(j)} = y_t^{(j)} - \hat{y}_t^{(j)},
+\label{eq:residual_def}
+\end{equation}
+and the corresponding nonconformity score is taken as the absolute residual,
+\begin{equation}
+a_t^{(j)} = \left|r_t^{(j)}\right|.
+\label{eq:nonconformity_abs}
+\end{equation}
+The rationale is simple: when the forecasting model has learned normal system dynamics adequately, normal observations should produce moderate residuals, whereas abnormal observations should induce unusually large residuals.
+
+Conformal prediction provides a principled framework for transforming such residuals into uncertainty-calibrated decision rules \cite{shafer2008tutorial}. In standard split conformal prediction, a calibration set is used to compute nonconformity scores, and empirical quantiles of these scores are then used to construct prediction regions with finite-sample marginal coverage under exchangeability assumptions. For a scalar target, a conformal prediction interval can be written as
+\begin{equation}
+\mathcal{C}_{1-\alpha}(\mathbf{x}_t) = \left[\hat{y}_t - q_{1-\alpha},\ \hat{y}_t + q_{1-\alpha}\right],
+\label{eq:conformal_interval}
+\end{equation}
+where $q_{1-\alpha}$ is the empirical $(1-\alpha)$-quantile of calibration residuals. An observation falls outside this interval when its residual is unusually large relative to the calibration distribution.
+
+In this thesis, the same idea is adapted from prediction-set construction to anomaly thresholding. For each target $j$, the validation set is used as a calibration set, and the threshold is defined as an empirical quantile of absolute residuals,
+\begin{equation}
+\tau_j = Q_{\kappa}\!\left(\left\{ a_i^{(j)} : i \in \mathcal{V} \right\}\right),
+\label{eq:global_threshold}
+\end{equation}
+where $\mathcal{V}$ is the validation index set and $Q_{\kappa}(\cdot)$ denotes the empirical quantile at level $\kappa$. The implemented system uses a conformal-style calibration with $\kappa = 0.90$, which yields a target-specific threshold learned directly from validation residual behavior. A statistical anomaly candidate is then declared whenever
+\begin{equation}
+\mathbb{I}_{\mathrm{anom}}^{(j)}(t) = \mathbb{I}\!\left(a_t^{(j)} > \tau_j\right).
+\label{eq:basic_flag}
+\end{equation}
+
+Because electricity time series are strongly context-dependent, this thesis further extends the thresholding mechanism through \emph{bucketed calibration}. Let $b(t)$ denote a context bucket, such as hour-of-day or holiday status. Then the threshold becomes
+\begin{equation}
+\tau_j^{\bigl(b(t)\bigr)} = Q_{\kappa}\!\left(\left\{ a_i^{(j)} : i \in \mathcal{V},\ b(i)=b(t) \right\}\right).
+\label{eq:bucket_threshold}
+\end{equation}
+This is highly relevant for power-system data because forecast uncertainty is rarely uniform over time. Some hours are intrinsically more volatile than others, and using one global threshold for all operating conditions would either over-flag stable periods or under-flag volatile ones. In the implemented framework, hour-wise calibration is used to respect this diurnal heteroscedasticity.
+
+To aggregate deviations across multiple targets, the framework defines a combined anomaly score,
+\begin{equation}
+S_t = \sum_{j=1}^{m} \max\!\left(0, \frac{a_t^{(j)}}{\tau_j^{\bigl(b(t)\bigr)} + \varepsilon} - 1 \right),
+\label{eq:combined_score_theory}
+\end{equation}
+where $\varepsilon > 0$ is a small numerical constant. Equation \eqref{eq:combined_score_theory} has an intuitive interpretation: only residuals that exceed their calibrated thresholds contribute to the score, and larger exceedances contribute more strongly. This yields a severity measure that is sensitive both to the number of affected targets and to the extent of their threshold violations.
+
+A necessary theoretical caution is that classical conformal guarantees assume exchangeable observations, whereas electricity time series exhibit serial dependence, seasonality, and regime changes. Accordingly, the method used here should be understood as a \emph{conformal-style residual calibration} rather than as a strict finite-sample coverage guarantee in the strongest classical sense. Nevertheless, the conformal viewpoint remains valuable because it turns anomaly detection into a validation-calibrated, data-adaptive procedure instead of an arbitrary fixed-threshold heuristic. In operational practice, this is a substantial improvement: uncertainty is estimated from observed predictive behavior, and anomaly boundaries are therefore tied to empirical model performance rather than to ad hoc constants.
+
+Overall, conformal thresholding completes the theoretical bridge between forecasting and anomaly reasoning. The dCeNN--ELM module defines what the system expects to see, residuals quantify deviation from that expectation, conformal-style calibration determines how much deviation is tolerable under normal conditions, and ASP then decides whether a statistically surprising event is also logically credible.
+
+\FloatBarrier
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{images/Threshould.png}
+	\caption{Conformal-style residual thresholding pipeline. Validation residuals are converted into absolute nonconformity scores, from which target-specific thresholds are estimated as empirical quantiles, optionally within context buckets such as hour-of-day or holiday state. At test time, observed residuals are compared against these calibrated thresholds to produce anomaly flags and a combined anomaly severity score.}
+	\label{Threshould}
+\end{figure}
+\FloatBarrier 
+
+\FloatBarrier
+
+\begin{table}[H]
+\centering
+\caption{Core theoretical components of the proposed framework.}
+\label{tab:theory_components}
+\begin{tabular}{|p{3.2cm}|p{4.2cm}|p{5.2cm}|}
+\hline
+\textbf{Component} & \textbf{Theoretical role} & \textbf{Role in this thesis} \\
+\hline
+Discrete Cellular Neural Network (dCeNN) & Nonlinear representation learning with local interactions and iterative state updates & Encodes engineered temporal features into a compact latent state using masked local recurrent connectivity \\
+\hline
+Extreme Learning Machine (ELM) & Fast analytical learning of output weights on fixed hidden representations & Maps dCeNN latent codes to multivariate forecasts through ridge-regularized closed-form regression \\
+\hline
+Answer Set Programming (ASP) & Declarative reasoning under stable-model semantics & Filters statistical anomalies using persistence, holiday, radiation, wind-ramp, and co-anomaly rules \\
+\hline
+Conformal thresholding & Calibration of uncertainty from validation residuals & Converts residuals into adaptive per-target anomaly thresholds, optionally bucketed by context \\
+\hline
+\end{tabular}
+\end{table}
+
+\FloatBarrier

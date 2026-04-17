@@ -9,20 +9,20 @@ A careful interpretation of the forecasting results is required. The purpose of 
 
 The benchmark comparison table available in the repository summarizes the main model-level results across training time, inference latency, and target-wise RMSE for solar, wind, load, and price \cite{repo_benchmark_comparison}. These results are reproduced in Table~\ref{tab:benchmark_comparison_ch71}.
 
-\begin{table}[htbp]
+\begin{table}[H]
 	\centering
 	\caption{Benchmark comparison of the proposed dCeNN--ELM model against Ridge and LSTM on the committed repository results.}
 	\label{tab:benchmark_comparison_ch71}
 	\small
-	\begin{tabular}{|p{3.3cm}|r|r|r|r|r|r|}
+	\begin{tabular}{|p{2.5cm}|p{1.8cm}|p{2.0cm}|p{1.8cm}|p{1.8cm}|p{1.8cm}|p{1.8cm}|}
 		\hline
 		\textbf{Model} & \textbf{Train Time (s)} & \textbf{Inference Latency (ms)} & \textbf{RMSE Solar} & \textbf{RMSE Wind} & \textbf{RMSE Load} & \textbf{RMSE Price} \\
 		\hline
 		dCeNN--ELM (Proposed) & 1.642 & 0.0873 & 0.1024 & 0.3236 & 4663.77 & 219.98 \\
 		\hline
-		LSTM (Baseline--Sequential) & 430.085 & 0.3284 & 0.0857 & 0.2263 & 6266.13 & 252.34 \\
+		LSTM (Baseline) & 430.085 & 0.3284 & 0.0857 & 0.2263 & 6266.13 & 252.34 \\
 		\hline
-		Ridge (Linear Baseline) & 0.0418 & 0.0649 & 0.0851 & 0.0782 & 219.94 & 20.05 \\
+		Ridge (Linear) & 0.0418 & 0.0649 & 0.0851 & 0.0782 & 219.94 & 20.05 \\
 		\hline
 	\end{tabular}
 \end{table}
@@ -31,24 +31,25 @@ The committed benchmark results reveal a mixed but highly informative pattern. R
 
 This outcome is academically important and should be stated honestly. The proposed architecture does not dominate the baselines on pure forecasting error in the benchmark artifact currently stored in the repository. Nevertheless, the result is still meaningful for the thesis because the claimed value of the dCeNN--ELM model is not solely ``best RMSE at all costs.'' Rather, its intended role is to provide a lightweight nonlinear forecasting backbone that remains computationally modest, structurally interpretable, and easily integrable with threshold calibration, ASP refinement, and edge export. The benchmark comparison therefore establishes the trade-off context for the rest of the chapter: forecasting accuracy must be interpreted together with deployment and neuro-symbolic utility, not in isolation.
 
-\begin{figure}[htbp]
+\FloatBarrier
+\begin{figure}[H]
 	\centering
-	% \includegraphics[width=0.92\textwidth]{reports/figures/benchmark_comparison.png}
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for benchmark comparison figure}}
-	\caption{Benchmark comparison across dCeNN--ELM, Ridge, and LSTM. This figure should visualize the committed repository comparison in terms of RMSE, training time, and inference latency.}
+	\includegraphics[width=\linewidth]{benchmark_comparison.png}
+	\caption{Benchmark comparison across dCeNN--ELM, Ridge, and LSTM. This figure visualize the committed repository comparison in terms of RMSE, training time, and inference latency.}
 	\label{fig:benchmark_comparison_ch71}
 \end{figure}
+\FloatBarrier
 
 \subsection{Detailed Forecasting Metrics on the 2022 Test Period}
 
 The benchmark table provides a compact comparison across models, but the detailed forecasting behaviour of the anomaly pipeline is best understood through the dedicated test-period metrics reported in \texttt{metrics\_summary.csv}. These results summarize the forecasting quality of the model used in the anomaly-detection workflow across the four main targets: solar capacity factor, wind capacity factor, load, and price \cite{repo_metrics_summary}. Table~\ref{tab:metrics_summary_ch71} reproduces the committed values.
 
-\begin{table}[htbp]
+\begin{table}[H]
 	\centering
 	\caption{Detailed forecasting metrics on the 2022 test set for the implemented anomaly-detection pipeline.}
 	\label{tab:metrics_summary_ch71}
 	\small
-	\begin{tabular}{|p{2.4cm}|r|r|r|r|r|r|}
+	\begin{tabular}{|p{2.2cm}|p{1.6cm}|p{1.6cm}|p{2.0cm}|p{1.5cm}|p{1.6cm}|p{2.5cm}|}
 		\hline
 		\textbf{Target} & \textbf{RMSE} & \textbf{MAE} & \textbf{MAPE (\%)} & \textbf{$R^2$} & \textbf{Points} & \textbf{Anomaly Count} \\
 		\hline

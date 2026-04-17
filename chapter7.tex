@@ -1,0 +1,109 @@
+
+\section{Forecasting Performance}
+\label{sec:forecasting_performance}
+
+This section evaluates the forecasting behaviour of the proposed dCeNN--ELM backbone against the two benchmark models introduced earlier, namely the LSTM sequential baseline and the Ridge linear baseline. Since the anomaly-detection stage in the present thesis is driven by forecast residuals, forecasting quality is not a secondary matter; it directly determines the reliability of subsequent thresholding, anomaly generation, and symbolic refinement. A model that produces unstable or systematically biased forecasts will inflate residuals and thereby distort the anomaly set. For this reason, the forecasting comparison is treated here as the first layer of the overall results analysis.
+
+The available repository outputs support this comparison at two complementary levels. First, the benchmark aggregation file \texttt{reports/tables/benchmark\_comparison.csv} provides model-level results for dCeNN--ELM, LSTM, and Ridge over the main forecasting and efficiency dimensions fileciteturn111file0. Second, the evaluation tables \texttt{reports/tables/metrics\_summary.csv} and \texttt{reports/tables/metrics\_monthly.csv} provide detailed target-level and month-level error summaries for the anomaly-detection forecast outputs used in the downstream pipeline fileciteturn112file0 fileciteturn114file0. Taken together, these artifacts allow a structured interpretation of both absolute forecasting quality and temporal error variability.
+
+\subsection{Benchmark Comparison Across dCeNN--ELM, LSTM, and Ridge}
+
+The global benchmark comparison is summarized in Table~\ref{tab:benchmark_forecasting_ch7}. The committed repository results show a clear empirical pattern. In the current benchmark snapshot, Ridge achieves the lowest RMSE for all four target variables, while also being the fastest model to train and one of the lowest-latency models at inference. Specifically, Ridge records RMSE values of 0.0851 for solar capacity factor, 0.0782 for wind capacity factor, 219.94~MW for load, and 20.05~EUR/MWh for price fileciteturn111file0. By comparison, the proposed dCeNN--ELM model records 0.1024, 0.3236, 4663.77~MW, and 219.98~EUR/MWh respectively, while the LSTM baseline records 0.0857, 0.2263, 6266.13~MW, and 252.34~EUR/MWh fileciteturn111file0.
+
+These results lead to a nuanced conclusion. In the present repository snapshot, the proposed model does \emph{not} outperform Ridge in pure forecasting accuracy, nor does it outperform Ridge in raw inference efficiency. However, it remains materially more efficient than the LSTM baseline at both training and inference time. The dCeNN--ELM benchmark reports a training time of 1.64~s and an inference latency of 0.087~ms, compared with 430.08~s and 0.328~ms for LSTM fileciteturn111file0. Parameter count shows the same pattern: dCeNN--ELM uses 8{,}016 parameters, whereas LSTM uses 79{,}364 parameters, corresponding to an order-of-magnitude reduction in model size fileciteturn111file0. Thus, while the committed benchmark results do not support a claim of forecasting superiority over Ridge, they do support a claim of substantially improved efficiency relative to the recurrent deep baseline.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Benchmark comparison of the three forecasting models based on the committed repository results.}
+	\label{tab:benchmark_forecasting_ch7}
+	\small
+	\begin{tabular}{|p{3.3cm}|p{1.4cm}|p{1.4cm}|p{1.8cm}|p{1.8cm}|}
+		\hline
+		\textbf{Model} & \textbf{RMSE$_{\text{Load}}$} & \textbf{RMSE$_{\text{Price}}$} & \textbf{Train Time (s)} & \textbf{Inference Latency (ms)} \\
+		\hline
+		dCeNN--ELM (Proposed) & 4663.77 & 219.98 & 1.64 & 0.0873 \\
+		\hline
+		LSTM (Baseline-Sequential) & 6266.13 & 252.34 & 430.08 & 0.3284 \\
+		\hline
+		Ridge (Linear Baseline) & 219.94 & 20.05 & 0.0418 & 0.0649 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+	\centering
+	\fbox{\parbox[c][6cm][c]{0.88\linewidth}{\centering
+			\textbf{Insert Figure Here}\\[4pt]
+			Benchmark comparison plot from \texttt{reports/figures/benchmark\_comparison.png}\\
+			(load RMSE, price RMSE, training time, and inference latency).}}
+	\caption{Overall benchmark comparison among dCeNN--ELM, LSTM, and Ridge.}
+	\label{fig:benchmark_comparison_ch7}
+\end{figure}
+
+\subsection{Interpretation of the Comparative Forecasting Results}
+
+A purely performance-oriented reading of Table~\ref{tab:benchmark_forecasting_ch7} would favour Ridge quite strongly. That result is important and should not be understated. It indicates that, for the currently committed benchmark artifacts, the engineered feature space is sufficiently informative that a regularized linear model can produce very competitive---indeed superior---forecasts across the selected targets. This is especially striking for the price variable, where Ridge reduces RMSE to 20.05~EUR/MWh, compared with 219.98 for dCeNN--ELM and 252.34 for LSTM fileciteturn111file0.
+
+However, this does not make the proposed model irrelevant. Instead, it reframes its role. The dCeNN--ELM architecture should be interpreted less as a universal winner in raw forecasting error and more as a lightweight nonlinear backbone designed to integrate naturally with residual-based anomaly detection, symbolic vetoing, and edge-oriented deployment. In the present results, its clearest quantitative advantage is over the LSTM baseline, not over Ridge. Relative to LSTM, dCeNN--ELM achieves substantially lower training cost, lower inference latency, and drastically fewer parameters while remaining within the same overall modeling family of learned nonlinear sequence approximators fileciteturn111file0. This makes it a more plausible candidate for compact neuro-symbolic systems than a heavier recurrent alternative.
+
+In other words, the benchmark results suggest that the forecasting story of the thesis is not one of simple dominance, but of trade-off. Ridge is strongest in pure numerical accuracy in the committed benchmark table. LSTM is the heaviest model and underperforms both competitors on the main reported metrics. dCeNN--ELM occupies an intermediate engineering position: less accurate than Ridge in this snapshot, but much lighter than LSTM and inherently better aligned with the export and neuro-symbolic integration goals of the full system.
+
+\subsection{Detailed Error Profile of the Forecasting Backbone}
+
+The repository-wide metrics summary provides a more granular picture of the forecast outputs used by the anomaly-detection stage. The global summary table reports the following error values for the forecasting traces stored in \texttt{anomalies\_2022.csv}: RMSE values of 0.1226 for solar capacity factor, 0.2554 for wind capacity factor, 1934.12~MW for load, and 209.34~EUR/MWh for price fileciteturn112file0. The corresponding MAE values are 0.1085, 0.2214, 1605.59~MW, and 174.92~EUR/MWh respectively fileciteturn112file0.
+
+Two observations are important here. First, the difficulty of the forecasting problem is clearly target-dependent. Load and price are much harder to predict accurately in absolute units than renewable capacity factors, which is expected given the larger scale and volatility of those variables. Second, the anomaly counts stored alongside the forecast outputs are also highly uneven: 3{,}502 for solar, 4{,}155 for wind, 1{,}237 for load, and 4{,}927 for price fileciteturn112file0. This suggests that the forecasting error structure is already shaping the later anomaly density in meaningful ways, with price emerging as the most volatile and anomaly-prone signal in the current pipeline.
+
+The reported $R^2$ values are negative for all four targets in the global summary table fileciteturn112file0. In a forecasting context, this indicates that the stored prediction traces perform worse than a simple mean predictor under the standard variance-explained interpretation. This is a significant empirical finding and should be acknowledged directly in the thesis rather than softened. It implies that the forecasting backbone, at least in the committed repository result set, is not yet numerically strong in the conventional regression sense, even though it remains useful as a generator of residual structure for subsequent anomaly analysis. This distinction matters: the framework may still be informative for anomaly ranking and symbolic refinement even when raw forecast fit is imperfect.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Global forecasting metrics derived from \texttt{metrics\_summary.csv}.}
+	\label{tab:metrics_summary_ch7}
+	\small
+	\begin{tabular}{|p{2.2cm}|p{1.2cm}|p{1.2cm}|p{1.5cm}|p{1.2cm}|p{1.4cm}|}
+		\hline
+		\textbf{Target} & \textbf{RMSE} & \textbf{MAE} & \textbf{MAPE (\%)} & \textbf{$R^2$} & \textbf{Anomaly Count} \\
+		\hline
+		CF\_Solar & 0.1226 & 0.1085 & 1599.10 & -2.4313 & 3502 \\
+		\hline
+		CF\_Wind & 0.2554 & 0.2214 & 1485.64 & -0.3206 & 4155 \\
+		\hline
+		Load\_MW & 1934.12 & 1605.59 & 22.37 & -1.3213 & 1237 \\
+		\hline
+		Price & 209.34 & 174.92 & 62.64 & -2.0673 & 4927 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsection{Temporal Variation in Forecast Error}
+
+The monthly metrics table reveals that forecasting quality is not uniform across the 2022 test year. Instead, it varies substantially by season and by target fileciteturn114file0. This temporal variation is particularly relevant for a weather-driven anomaly-detection system, because poor forecasting months will tend to generate larger residuals and, potentially, more anomaly candidates.
+
+For the proposed forecasting traces, solar prediction is most accurate in October, where RMSE drops to 0.0902, and least accurate in August, where RMSE rises to 0.1453 fileciteturn114file0. Wind shows its best monthly RMSE in February at 0.1701 and its worst in August at 0.3504 fileciteturn114file0. Load forecasting is strongest in August at 1608.87~MW RMSE and weakest in March at 2178.26~MW fileciteturn114file0. Price forecasting shows the most dramatic variability of all: the lowest monthly RMSE occurs in February at 88.77~EUR/MWh, while the highest occurs in August at 357.05~EUR/MWh fileciteturn114file0. This pattern strongly suggests that summer and late-summer conditions are particularly challenging for the current forecasting pipeline, especially for wind and price.
+
+A simple seasonal aggregation of the monthly RMSE values reinforces this conclusion. For the price target, average seasonal RMSE is approximately 147.15 in winter, 148.60 in spring, 267.61 in summer, and 192.24 in autumn, making summer the most difficult season by a wide margin. Wind shows a similar pattern, with average RMSE of 0.1931 in winter, 0.2457 in spring, 0.3065 in summer, and 0.2492 in autumn. Solar behaves somewhat differently, with autumn and winter performing better than summer, but the summer degradation remains visible. These patterns are consistent with the broader interpretation of the dataset as a weather-sensitive system whose forecasting difficulty increases under more variable seasonal operating regimes.
+
+\begin{figure}[htbp]
+	\centering
+	\fbox{\parbox[c][6cm][c]{0.88\linewidth}{\centering
+			\textbf{Insert Figure Here}\\[4pt]
+			Suggested plot based on \texttt{reports/tables/metrics\_monthly.csv}:\\
+			monthly RMSE trends for CF\_Solar, CF\_Wind, Load\_MW, and Price.}}
+	\caption{Monthly forecasting error trends across the 2022 test period.}
+	\label{fig:monthly_rmse_ch7}
+\end{figure}
+
+\subsection{Residual Quality and Its Implications for Downstream Detection}
+
+Because the anomaly detector is built on forecast residuals, the forecasting results should be interpreted in downstream terms rather than only as a standalone regression contest. Poorer predictive fit does not automatically invalidate the anomaly pipeline, but it does change how the later stages must be interpreted.
+
+In the present system, residual magnitude is transformed into target-wise anomaly decisions through calibrated thresholds and then further refined by ASP-based symbolic reasoning. This means that forecasting errors have a dual role. On the one hand, they represent prediction imperfection. On the other hand, they define the raw material from which anomaly candidates are constructed. Accordingly, the significance of the forecasting comparison lies not only in identifying the numerically strongest model, but also in understanding how residual behaviour differs across the candidate backbones.
+
+The current committed results suggest three practical implications. First, the strong Ridge benchmark means that future revisions of the thesis should take linear baselines very seriously rather than treating them as weak references. Second, the poor monthly behaviour of the price and wind forecasts in summer indicates that anomaly density in those periods may be partly error-driven and should therefore be interpreted carefully in later sections. Third, the efficiency advantage of dCeNN--ELM over LSTM remains relevant because the forecasting core is only one component in a wider neuro-symbolic system that also values compact deployment and structured downstream reasoning.
+
+\subsection{Synthesis}
+
+Overall, the forecasting results paint a mixed but analytically valuable picture. In the committed repository benchmark table, Ridge is the strongest model in terms of raw forecasting accuracy and also the most efficient in training time, while LSTM is the weakest of the three across the main reported dimensions fileciteturn111file0. The proposed dCeNN--ELM backbone does not dominate on pure RMSE, but it does retain a strong efficiency advantage over LSTM and remains better aligned with the deployment and modularity goals of the full framework. The monthly evaluation further shows that forecasting difficulty is highly non-uniform across the year, with summer months---especially August---being the most challenging for several targets, particularly price and wind fileciteturn114file0.
+
+This leads to an important interpretive stance for the rest of Chapter~7. The value of the proposed system should not be judged solely by whether its forecasts outperform every baseline on every target. Rather, it should be judged by how its forecasting residuals, symbolic refinement, and finance-aware evaluation work together as an integrated anomaly-analysis system. The next section therefore turns from forecasting behaviour to anomaly-detection performance and examines how the ASP veto layer reshapes the raw anomaly set.

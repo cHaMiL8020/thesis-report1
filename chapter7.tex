@@ -90,13 +90,14 @@ Fourth, \textbf{solar forecasting is affected strongly by low-output periods and
 
 These month-wise results are important because they show that a single global forecasting metric can conceal periods of major instability. For an anomaly-detection framework, this matters directly: anomaly density and threshold behaviour are likely to be affected by the seasonal structure of residuals. The monthly analysis therefore strengthens the case for later threshold calibration and symbolic refinement, especially in the most volatile seasons.
 
-\begin{figure}[htbp]
+\FloatBarrier
+\begin{figure}[H]
 	\centering
-	% \includegraphics[width=0.92\textwidth]{reports/figures/monthly_forecasting_performance.png}
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for monthly or seasonal forecasting performance figure}}
-	\caption{Temporal variation in forecasting performance across the 2022 test period. This figure may be populated later using the monthly metrics or derived seasonal plots.}
-	\label{fig:monthly_forecasting_performance_ch71}
+	\includegraphics[width=\linewidth]{master_timeline_Load_MW.png}
+	\caption{Master timeline for the Load\_MW target over the 2022 test period, illustrating the temporal evolution of actual and predicted load, residual behaviour, and the corresponding anomaly-flag structure used in the downstream neuro-symbolic analysis.}
+	\label{fig:monthly_forecasting_performance_load_ch71}
 \end{figure}
+\FloatBarrier
 
 \subsection{Interpretation Relative to the Proposed Thesis Contribution}
 
@@ -115,3 +116,249 @@ Third, the forecasting difficulty itself helps motivate the symbolic layer. The 
 Overall, the forecasting results paint a mixed but analytically valuable picture. In the committed repository benchmark table, Ridge is the strongest model in terms of raw forecasting accuracy and also the most efficient in training time, while LSTM is the weakest of the three across the main reported dimensions \cite{repo_benchmark_comparison}. The proposed dCeNN--ELM backbone does not dominate on pure RMSE, but it does retain a strong efficiency advantage over LSTM and remains better aligned with the deployment and modularity goals of the full framework.
 
 The monthly evaluation further shows that forecasting difficulty is highly non-uniform across the year, with summer months---especially August---being the most challenging for several targets, particularly price and wind \cite{repo_metrics_monthly}. This leads to an important interpretive stance for the rest of Chapter~7. The value of the proposed system should not be judged solely by whether its forecasts outperform every baseline on every target. Rather, it should be judged by how its forecasting residuals, symbolic refinement, and finance-aware evaluation work together as an integrated anomaly-analysis system. The next section therefore turns from forecasting behaviour to anomaly-detection performance and examines how the ASP veto layer reshapes the raw anomaly set.
+
+\section{Neuro-Symbolic Refinement and False-Alarm Reduction}
+\label{sec:ns_refinement_false_alarm_reduction}
+
+This section evaluates the effect of the symbolic refinement layer on the raw anomaly set produced by the forecasting-based detector. In the proposed framework, anomaly generation is deliberately staged. The neural layer first produces raw statistical anomaly candidates from residual exceedance, after which the ASP layer refines this candidate set by enforcing persistence, physical plausibility, and selected market-consistency constraints. The objective of this second stage is not to create anomalies from scratch, but to reduce implausible or weakly supported false alarms before they are passed to downstream interpretation and utility analysis.
+
+This distinction is central to the contribution of the thesis. A purely statistical detector may flag many unusual residuals, but not all of those flags are equally meaningful in domain terms. In a weather-driven electricity setting, some raw anomaly candidates are expected to be spurious, context-dependent, or insufficiently supported by cross-signal evidence. The neuro-symbolic layer therefore acts as a plausibility filter that transforms a broad raw anomaly set into a narrower, more credible refined anomaly set. The key question addressed in this section is thus not only \emph{how many} anomalies were detected, but also \emph{how many of them survived symbolic scrutiny}.
+
+\subsection{Raw Statistical Anomaly Burden}
+
+The raw anomaly burden can be read directly from the committed repository evaluation outputs. According to the global metrics summary for the 2022 test period, the raw statistical detector produced the following anomaly counts: 3502 for solar capacity factor, 4155 for wind capacity factor, 1237 for load, and 4927 for price \cite{repo_metrics_summary}. These values indicate that the raw detector is especially active for price and wind, while load produces substantially fewer anomaly flags.
+
+This pattern is analytically important. Price and wind are also among the most difficult signals in the forecasting evaluation, particularly during volatile months. Their large raw anomaly counts therefore suggest that forecasting instability and contextual uncertainty propagate directly into the raw anomaly set. This is precisely the scenario in which a symbolic plausibility layer becomes valuable: when the raw detector is informative but overly permissive.
+
+To formalize the refinement process, let $N_j^{\mathrm{raw}}$ denote the number of raw anomaly flags for target $j$, and let $N_j^{\mathrm{ref}}$ denote the number of anomalies that remain after ASP refinement. Then the number of eliminated alarms is
+\begin{equation}
+	N_j^{\mathrm{veto}} = N_j^{\mathrm{raw}} - N_j^{\mathrm{ref}},
+	\label{eq:veto_count_ch72}
+\end{equation}
+and the corresponding retention rate is
+\begin{equation}
+	R_j = \frac{N_j^{\mathrm{ref}}}{N_j^{\mathrm{raw}}}\times 100.
+	\label{eq:retention_rate_ch72}
+\end{equation}
+These quantities provide the most direct summary of false-alarm reduction in the current neuro-symbolic design.
+
+% Replace the placeholder values in the Refined/Vetoed/Retention columns
+% using the final committed or generated outputs from anomalies_refined.csv
+% and/or the veto analysis summary produced by the repository scripts.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Raw versus refined anomaly counts by target. Raw counts are taken from the repository metrics summary; refined counts, vetoed counts, and retention rates from the final refined anomaly outputs.}
+	\label{tab:raw_vs_refined_counts_ch72}
+	\small
+	\begin{tabular}{|p{2.5cm}|r|r|r|r|}
+		\hline
+		\textbf{Target} & \textbf{Raw Count} & \textbf{Refined Count} & \textbf{Vetoed Count} & \textbf{Retention Rate (\%)} \\
+		\hline
+		Solar & 3502 & 476 & 3026 & 13.59 \\
+		Wind  & 4155 & 2238 & 1917 & 53.86 \\
+		Load  & 1237 & 330 & 907 & 26.68 \\
+		Price & 4927 & 3028 & 1899 & 61.46 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+Even before the refined counts are inserted, the raw count structure already reveals where symbolic filtering is likely to matter most. Since price and wind have the largest raw anomaly burden, they are the most plausible candidates for meaningful false-alarm reduction. Load, by contrast, may benefit more selectively from calendar-aware veto logic than from broad statistical pruning.
+
+\subsection{Veto Reasoning Analysis}
+
+The repository includes a dedicated visualization script, \texttt{src/21\_plot\_veto\_analysis.py}, which generates a target-wise comparison between confirmed symbolic anomalies and vetoed anomalies \cite{repo_veto_analysis_plot}. This figure should be treated as the primary visual summary of neuro-symbolic refinement in the chapter because it directly illustrates how much of the raw anomaly burden is retained and how much is suppressed after ASP reasoning.
+
+Conceptually, the veto reasoning plot is important for two reasons. First, it quantifies the effect of the symbolic layer in a way that aggregate forecasting metrics cannot. Second, it shifts the interpretation of anomaly detection away from a pure count-maximization mindset. A stronger detector is not one that simply flags more timestamps; rather, it is one that preserves the most plausible anomalies while eliminating those that are inconsistent with domain knowledge.
+
+\FloatBarrier
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{veto_reasoning_analysis.png}
+	\caption{Target-wise veto reasoning analysis illustrating the impact of the ASP-based neuro-symbolic refinement layer on the raw anomaly set. For each signal, the figure compares anomalies retained after symbolic validation with anomalies vetoed by rule-based plausibility checks, thereby highlighting the extent of false-alarm reduction achieved by the proposed framework.}
+	\label{fig:veto_analysis_ch73}
+\end{figure}
+\FloatBarrier
+
+When interpreted together with the raw anomaly counts, this figure provides the clearest answer to the main research question of this section: to what extent does the ASP layer reduce false alarms without collapsing the anomaly signal entirely? In the final thesis version, the narrative in this subsection should be updated using the actual confirmed and vetoed counts from the generated figure and refined anomaly outputs.
+
+\subsection{Veto Reason Summary}
+
+A more detailed explanation of false-alarm reduction is provided through the report-level veto summary generated by \texttt{src/25\_report\_tables.py} \cite{repo_report_tables}. An important methodological nuance must be stated explicitly: the current repository does \emph{not} store explicit \texttt{veto\_reason} atoms in the committed refined anomaly CSV. Therefore, the report-table generator constructs a set of \emph{artifact-only proxy categories} based on target type, timestamp context, and supporting raw anomaly fields. These proxy categories are still useful for interpretation, but they should be described honestly as report-level explanatory summaries rather than direct solver-extracted labels.
+
+The repository defines the following main veto-reason categories:
+\begin{itemize}
+	\item \textbf{PV-at-night}, used when solar anomalies occur in time windows consistent with absent radiation;
+	\item \textbf{Wind-ramp-guard (proxy)}, used when wind-related anomalies are associated with unusually large short-term changes;
+	\item \textbf{Holiday/weekend-exemption (proxy)}, used when load-type anomalies coincide with weekend or holiday-like calendar context;
+	\item \textbf{Missing co-anomaly confirmation}, used especially for price anomalies lacking the supporting load anomaly relation;
+	\item \textbf{Transient non-persistent spike}, used for isolated or weakly supported anomalies that fail persistence-style confirmation.
+\end{itemize}
+
+These categories are highly valuable for the thesis because they move the discussion beyond a generic statement such as ``ASP removed some anomalies.'' Instead, they provide a domain-grounded interpretation of \emph{why} anomalies were removed. In other words, they connect false-alarm reduction to concrete symbolic logic.
+
+% Replace the placeholder counts and shares with values from
+% reports/tables/veto_reason_summary.csv after generation.
+
+\FloatBarrier
+\begin{table}[htbp]
+	\centering
+	\caption{Veto reason summary based on repository-defined proxy categories. Final counts and shares from the generated \texttt{veto\_reason\_summary.csv} output.}
+	\label{tab:veto_reason_summary_ch72}
+	\small
+	\begin{tabular}{|p{4.2cm}|r|r|}
+		\hline
+		\textbf{Veto Reason} & \textbf{Veto Count} & \textbf{Share of Vetoed False Positives (\%)} \\
+		\hline
+		PV-at-night & 2206 & 28.47 \\
+		Wind-ramp-guard (proxy) & 83 & 1.07 \\
+		Holiday/weekend-exemption (proxy) & 186 & 2.40 \\
+		Missing co-anomaly confirmation & 1869 & 24.12 \\
+		Transient non-persistent spike & 3405 & 43.94 \\
+		\hline
+	\end{tabular}
+\end{table}
+\FloatBarrier
+
+
+\subsection{ASP Impact Heatmap (Optional Visual Support)}
+
+The repository also includes an optional additional visualization in \texttt{src/24\_additional\_visuals.py}, which produces \texttt{asp\_impact\_heatmap.png} \cite{repo_additional_visuals}. This plot displays monthly confirmed and vetoed anomaly counts across the four main targets. While not strictly necessary, it can substantially strengthen the thesis chapter because it reveals whether symbolic refinement is temporally concentrated in specific parts of the year.
+
+This temporal view is valuable for two reasons. First, it helps link refinement behaviour to the monthly forecasting difficulty already discussed in Section~7.1. Second, it can reveal whether the symbolic layer is particularly active during volatile seasons such as summer and early autumn. If so, that would support the argument that ASP refinement is especially useful when raw statistical detection is under the greatest stress.
+
+\FloatBarrier
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{asp_impact_heatmap.png}
+	\caption{Monthly ASP impact heatmap comparing confirmed and vetoed anomalies for each target in 2022. The left panel visualizes the anomalies retained after symbolic validation, whereas the right panel shows anomalies rejected by the ASP-based refinement layer. This comparison highlights the temporal and target-specific role of symbolic reasoning in reducing false alarms and reshaping the raw anomaly set.}
+	\label{fig:veto_analysis_ch73}
+\end{figure}
+\FloatBarrier
+
+
+\subsection{Interpretation of False-Alarm Reduction}
+
+Taken together, the available repository outputs support a clear interpretation of the symbolic layer. The raw detector is intentionally permissive: it flags a broad candidate set from residual threshold exceedance. The ASP layer then acts as a conservative refinement stage, retaining anomalies that are persistent and contextually plausible while suppressing anomalies that conflict with calendar logic, physical plausibility, or cross-signal confirmation rules.
+
+This means that the neuro-symbolic contribution should not be evaluated by the crude question ``did the system detect more anomalies?'' The more important question is whether the system produced a \emph{better anomaly set}. In the context of this thesis, a better anomaly set is:
+\begin{itemize}
+	\item smaller where the raw detector is over-sensitive,
+	\item more physically and contextually plausible,
+	\item more interpretable because veto categories are explainable,
+	\item and more useful for the finance-aware downstream layer.
+\end{itemize}
+
+This is the sense in which the ASP component contributes to false-alarm reduction. It does not merely reduce anomaly volume; it enforces \emph{qualitative refinement}. That distinction is fundamental and should be emphasized in the final thesis discussion.
+
+\subsection{Synthesis}
+
+The results of this section should be interpreted as evidence that the symbolic layer materially reshapes the anomaly landscape produced by the raw detector. The statistical detector alone yields a large anomaly burden, especially for price and wind. The ASP layer then applies persistence, physical plausibility, and market-consistency constraints in order to prune implausible or weakly supported anomaly candidates. The final outcome is not simply fewer anomalies, but a refined anomaly set that is more defensible in domain terms.
+
+This is a key transition point in the thesis. Section~7.1 showed that forecasting accuracy alone does not fully capture the value of the proposed framework. Section~7.2 extends that argument by showing that anomaly quality depends critically on symbolic refinement. The next section therefore asks the most practically important follow-up question: whether this refined anomaly set also improves downstream financial utility in the simulated market-analysis setting.
+
+
+\section{Financial Impact of Refined Anomaly Signals}
+\label{sec:financial_impact_refined_signals}
+
+The previous section showed that the ASP-based refinement layer reduces implausible or weakly supported anomaly candidates. However, false-alarm reduction is only practically meaningful if it improves downstream usefulness. For that reason, this section evaluates the refined anomaly signals in a finance-aware backtesting setting, where anomaly decisions are translated into utility and penalty outcomes. The central question is therefore not only whether the neuro-symbolic pipeline produces fewer false alarms, but whether it produces anomaly signals that are more valuable when judged through cumulative utility.
+
+This part of the evaluation is important because anomaly detection in isolation can be misleading. A detector that produces many raw alerts may appear highly sensitive, yet still perform poorly if those alerts lead to frequent penalty-bearing decisions. Conversely, a more selective detector may generate higher overall value if it preserves the most actionable events and suppresses low-quality triggers. The proposed neuro-symbolic framework is designed precisely for this trade-off: it narrows the anomaly set in order to improve the utility-to-penalty balance of the final signals.
+
+Within the repository, this financial interpretation is implemented through a finance-mapping stage that converts anomaly outcomes into utility-relevant event streams \cite{repo_finance_mapping}. The resulting backtest outputs are then summarized and visualized through the dedicated utility-comparison script and report-table generation pipeline \cite{repo_utility_comparison_plot,repo_finance_backtest,repo_report_tables}.
+
+\subsection{Utility Formulation}
+
+Let $r_t$ denote the reward or gain associated with a useful anomaly signal at time $t$, and let $p_t$ denote the penalty associated with a false, weak, or otherwise undesirable signal. The net utility at time $t$ is then written as
+\begin{equation}
+	u_t = r_t - p_t,
+	\label{eq:net_utility_ch73}
+\end{equation}
+and cumulative utility up to time horizon $T$ is
+\begin{equation}
+	U(T) = \sum_{t=1}^{T} u_t.
+	\label{eq:cumulative_utility_ch73}
+\end{equation}
+
+To compare the raw neural signal stream with the refined neuro-symbolic stream, the cumulative utility gap can be expressed as
+\begin{equation}
+	\Delta U(T) = U_{\mathrm{NS}}(T) - U_{\mathrm{N}}(T),
+	\label{eq:utility_gap_ch73}
+\end{equation}
+where $U_{\mathrm{NS}}(T)$ denotes cumulative utility after ASP refinement and $U_{\mathrm{N}}(T)$ denotes cumulative utility from the raw neural anomaly stream. A positive value of $\Delta U(T)$ indicates that symbolic refinement improves the downstream economic value of anomaly detection.
+
+\subsection{Cumulative Utility Over Time}
+
+The most direct way to assess financial usefulness is to inspect cumulative utility over the full evaluation horizon. The repository includes a dedicated plotting script, \texttt{src/23\_plot\_utility\_comparison.py}, which produces a temporal comparison of utility accumulation over time \cite{repo_utility_comparison_plot}. This figure is important because it shows whether the advantage of the refined signals is stable, temporary, or concentrated in specific periods of the year.
+
+If the neuro-symbolic curve remains consistently above the raw neural curve, this indicates that the ASP refinement does more than remove anomalies: it improves the decision value of the retained signals. If the refined curve also exhibits fewer sharp downward movements, that would suggest that symbolic filtering successfully removes penalty-heavy false positives. In practical terms, a smoother and higher cumulative utility trajectory would mean that the refined anomaly stream is not only more selective, but more economically reliable.
+
+\begin{figure}[htbp]
+	\centering
+	% Replace with the generated cumulative utility figure from the repository outputs.
+	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for cumulative utility over time figure}}
+	\caption{Cumulative utility over time for the evaluated anomaly-signal variants. This figure should be populated using the output generated by \texttt{src/23\_plot\_utility\_comparison.py}.}
+	\label{fig:cumulative_utility_over_time_ch73}
+\end{figure}
+
+The narrative around this figure in the final thesis should focus on three aspects: first, the final end-of-period cumulative utility; second, whether the refined signal stream dominates the raw neural stream for most of the year; and third, whether the refined stream reduces downward utility shocks that are consistent with false-alarm penalties. Together, these observations directly connect anomaly-quality refinement to practical downstream benefit.
+
+\subsection{Neural versus Neuro-Symbolic Utility Comparison}
+
+While the cumulative curve provides a temporal view, a direct aggregate comparison between the neural and neuro-symbolic variants is also necessary. The same utility-analysis pipeline provides a model-level comparison that contrasts the total financial outcome of the raw neural detector and the ASP-refined detector \cite{repo_utility_comparison_plot}. This figure should be interpreted as the clearest answer to the question of whether symbolic refinement adds practical value beyond anomaly filtering alone.
+
+The key point here is that neuro-symbolic refinement may improve total utility even if it reduces the number of anomaly signals. In other words, the framework is not optimized for signal quantity, but for signal quality. A smaller signal set can still be superior if the removed anomalies are mostly penalty-generating false positives. This is exactly the expected behaviour of the proposed framework: retain anomalies that are persistent, plausible, and contextually supported, while removing those that are likely to reduce downstream value.
+
+\begin{figure}[htbp]
+	\centering
+	% Replace with the generated neural vs neuro-symbolic utility comparison figure.
+	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for neural vs neuro-symbolic utility comparison figure}}
+	\caption{Aggregate utility comparison between the raw neural anomaly stream and the neuro-symbolically refined anomaly stream. This figure should be populated from the utility-comparison outputs produced by \texttt{src/23\_plot\_utility\_comparison.py}.}
+	\label{fig:neural_vs_neuro_symbolic_utility_ch73}
+\end{figure}
+
+If the neuro-symbolic variant achieves higher net utility, the interpretation is straightforward: the ASP layer is not merely a rule-based post-processing stage, but a value-improving refinement mechanism. If, in addition, the penalty burden is lower for the refined variant, that would further strengthen the claim that symbolic reasoning improves anomaly usefulness by suppressing costly low-quality detections.
+
+\subsection{Utility and Penalty Summary}
+
+For precise reporting, the finance-aware backtest should also be summarized in tabular form. The repository includes a 2022 financial backtest table, \texttt{reports/tables/finance\_backtest\_2022.csv}, along with report-table generation logic in \texttt{src/25\_report\_tables.py} \cite{repo_finance_backtest,repo_report_tables}. This summary table should provide the main numerical evidence for the financial effect of signal refinement.
+
+A clear structure for the table is to compare raw neural and refined neuro-symbolic signals using gross utility, total penalties, net utility, and relative improvement. Gross utility captures the total value obtained from useful signals, total penalty captures the cost associated with poor signals, and net utility captures the final downstream outcome after both are combined. Relative improvement then makes it easy to quantify the added value of symbolic refinement.
+
+% Fill the final values from the generated finance backtest and report summary outputs.
+
+\begin{table}[htbp]
+	\centering
+	\caption{Utility and penalty summary for raw neural and neuro-symbolically refined anomaly signals. Final values should be inserted from the generated financial backtest outputs.}
+	\label{tab:utility_penalty_summary_ch73}
+	\small
+	\begin{tabular}{|p{4.0cm}|r|r|r|r|}
+		\hline
+		\textbf{Signal Variant} & \textbf{Gross Utility} & \textbf{Total Penalty} & \textbf{Net Utility} & \textbf{Relative Improvement (\%)} \\
+		\hline
+		Raw neural anomaly signals & [fill] & [fill] & [fill] & -- \\
+		\hline
+		Neuro-symbolically refined signals & [fill] & [fill] & [fill] & [fill] \\
+		\hline
+	\end{tabular}
+\end{table}
+
+Once populated, this table should be discussed in direct relation to the results from Section~7.2. If the refined signal stream produces lower penalties and higher net utility, then the false-alarm reduction observed earlier can be interpreted as practically beneficial rather than merely cosmetically selective. This would be strong evidence that symbolic refinement improves the usefulness of anomaly detection in a downstream operational setting.
+
+\subsection{Interpretation of the Financial Results}
+
+The main interpretation of this section is that anomaly refinement should be judged by value, not only by detection counts. A raw detector can produce many alerts, but if a substantial portion of those alerts are implausible or weakly supported, then the downstream system pays for that over-sensitivity through penalty accumulation. The ASP layer changes this balance by filtering the anomaly stream before it reaches the finance-aware evaluation stage.
+
+This leads to an important conceptual point. In the proposed framework, symbolic reasoning is not an isolated interpretability add-on. It has operational significance. By enforcing persistence, plausibility, and contextual support, it changes the distribution of accepted anomalies in a way that can improve cumulative utility. Thus, the benefit of the neuro-symbolic layer is twofold:
+\begin{enumerate}
+	\item it improves anomaly credibility by reducing false positives, and
+	\item it improves downstream value by reducing penalty-bearing signals.
+\end{enumerate}
+
+That combination is precisely what makes the overall framework more useful than a purely residual-based detector. In other words, the contribution of the ASP layer is not just that it explains anomaly decisions, but that it makes those decisions more economically meaningful.
+
+\subsection{Synthesis}
+
+Section~7.2 established that symbolic refinement reduces the raw anomaly burden by vetoing implausible or weakly supported detections. Section~7.3 extends that result by asking whether the retained anomalies are also more valuable in a downstream setting. The finance-aware analysis provides the answer. If the refined signal stream achieves a higher cumulative utility trajectory, a stronger aggregate utility result, and a better utility-to-penalty balance, then the case for neuro-symbolic refinement becomes substantially stronger.
+
+This section is therefore the practical bridge between anomaly quality and decision value. Forecasting errors generate anomaly candidates, symbolic reasoning improves their plausibility, and the financial evaluation shows whether that improvement matters in operational terms. If the final results confirm higher net utility for the refined signals, then the thesis can claim not only improved interpretability and reduced false alarms, but also improved downstream usefulness.

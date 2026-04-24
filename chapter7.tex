@@ -394,7 +394,7 @@ Table~\ref{tab:selected_high_severity_events} summarizes the four selected event
 	\caption{Selected high-severity case-study events drawn from \texttt{anomaly\_events\_2022.csv}.}
 	\label{tab:selected_high_severity_events}
 	\scriptsize
-	\setlength{\tabcolsep}{5pt}
+	\setlength{\tabcolsep}{7pt}
 	\renewcommand{\arraystretch}{1.15}
 	\begin{tabular}{|c|p{1.35cm}|p{2.0cm}|p{2.0cm}|c|c|c|c|p{1.1cm}|}
 		\hline
@@ -428,21 +428,14 @@ From a methodological perspective, this event is valuable because price is also 
 
 If the symbolic layer confirms rather than suppresses this event, that would support the claim that the framework is capable of preserving economically meaningful price disturbances rather than over-filtering them.
 
-\begin{figure}[htbp]
+\FloatBarrier
+\begin{figure}[H]
 	\centering
-	% Insert master timeline for Price here, e.g. reports/figures/master_timeline_Price.png
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for master timeline of the Price signal}}
+	\includegraphics[width=\linewidth]{master_timeline_Price.png}
 	\caption{Master timeline for the Price signal, including actual vs predicted values, residuals, raw vs symbolic anomaly flags, and cumulative utility.}
 	\label{fig:case_price_master_timeline}
 \end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	% Insert zoomed event comparison plot for the selected price event here
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for zoomed price-event comparison plot}}
-	\caption{Zoomed event comparison for price event 1197 over the selected August 2022 window.}
-	\label{fig:case_price_event_zoom}
-\end{figure}
+\FloatBarrier
 
 \subsection{Case Study B: High-Severity Load Event}
 
@@ -458,21 +451,15 @@ In the final figure set, the most important aspects to highlight for this event 
 	\item whether the event coincides with a noticeable change in utility trajectory.
 \end{itemize}
 
-\begin{figure}[htbp]
+\FloatBarrier
+\begin{figure}[H]
 	\centering
-	% Insert master timeline for Load_MW here, e.g. reports/figures/master_timeline_Load_MW.png
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for master timeline of the Load\_MW signal}}
+	\includegraphics[width=\linewidth]{master_timeline_Load_MW.png}
 	\caption{Master timeline for the Load\_MW signal, showing forecast deviation, anomaly flags, and cumulative utility context.}
 	\label{fig:case_load_master_timeline}
 \end{figure}
+\FloatBarrier
 
-\begin{figure}[htbp]
-	\centering
-	% Insert zoomed event comparison plot for the selected load event here
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for zoomed load-event comparison plot}}
-	\caption{Zoomed event comparison for load event 640 over the selected July 2022 window.}
-	\label{fig:case_load_event_zoom}
-\end{figure}
 
 \subsection{Case Study C: High-Severity Renewable Event}
 
@@ -488,21 +475,15 @@ The corresponding plots should be interpreted with attention to:
 	\item whether the event contributes positively to the downstream utility analysis.
 \end{itemize}
 
-\begin{figure}[htbp]
+\FloatBarrier
+\begin{figure}[H]
 	\centering
-	% Insert master timeline for CF_Wind here, e.g. reports/figures/master_timeline_CF_Wind.png
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for master timeline of the CF\_Wind signal}}
+	\includegraphics[width=0.9\linewidth]{master_timeline_CF_Wind.png}
 	\caption{Master timeline for the CF\_Wind signal, showing actual vs predicted behaviour, anomaly flags, and utility context.}
 	\label{fig:case_wind_master_timeline}
 \end{figure}
+\FloatBarrier
 
-\begin{figure}[htbp]
-	\centering
-	% Insert zoomed event comparison plot for the selected wind event here
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for zoomed wind-event comparison plot}}
-	\caption{Zoomed event comparison for wind event 420 over the selected July 2022 window.}
-	\label{fig:case_wind_event_zoom}
-\end{figure}
 
 \subsection{Case Study D: Multi-Signal Event}
 
@@ -520,21 +501,15 @@ The multivariate case study should therefore emphasize:
 	\item whether the downstream utility analysis benefits from preserving this joint event.
 \end{itemize}
 
-\begin{figure}[htbp]
+\FloatBarrier
+\begin{figure}[H]
 	\centering
-	% Insert supporting joint anomaly figure here if desired, e.g. reports/figures/additional_visuals/joint_anomaly_upset.png
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for joint anomaly overlap or multi-signal supporting figure}}
-	\caption{Optional supporting figure for multivariate anomaly overlap, motivating the multi-signal case study.}
+	\includegraphics[width=\linewidth]{joint_anomaly_upset.png}
+	\caption{Supporting figure for multivariate anomaly overlap, motivating the multi-signal case study.}
 	\label{fig:case_multisignal_support}
 \end{figure}
+\FloatBarrier
 
-\begin{figure}[htbp]
-	\centering
-	% Insert event-focused multi-signal visualization here
-	\fbox{\parbox[c][6cm][c]{0.9\textwidth}{\centering Placeholder for zoomed multi-signal event comparison plot}}
-	\caption{Zoomed comparison for multi-signal event 881 over the selected August 2022 window.}
-	\label{fig:case_multisignal_event_zoom}
-\end{figure}
 
 \subsection{Cross-Case Interpretation}
 

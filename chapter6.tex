@@ -2,13 +2,13 @@
 \section{Software Engineering Aspect}
 \label{sec:software_engineering_aspect}
 
-The implementation of the proposed dCeNN--ELM--ASP framework is not organized as a single monolithic script, but as a modular Python pipeline whose architecture mirrors the conceptual stages of the thesis. This design choice is methodologically important. In applied neuro-symbolic systems, performance alone is not sufficient; the software must also be reproducible, inspectable, extensible, and operationally maintainable. A pipeline that entangles preprocessing, model training, anomaly detection, symbolic reasoning, utility mapping, and reporting in one opaque program would make the scientific claims of the thesis much harder to validate. The present implementation avoids this by enforcing a stage-oriented workflow with explicit interfaces between components, artifact-based handoffs, and Makefile-driven orchestration \cite{abeysekara2025report,repo_readme_ch61,repo_makefile_ch61}.
+The implementation of the proposed dCeNN--ELM--ASP framework is not organized as a single monolithic script, but as a modular Python pipeline whose architecture mirrors the conceptual stages of the thesis. This design choice is methodologically important. In applied neuro-symbolic systems, performance alone is not sufficient; the software must also be reproducible, inspectable, extensible, and operationally maintainable. A pipeline that entangles preprocessing, model training, anomaly detection, symbolic reasoning, utility mapping, and reporting in one opaque program would make the scientific claims of the thesis much harder to validate. The present implementation avoids this by enforcing a stage-oriented workflow with explicit interfaces between components, artifact-based handoffs, and Makefile-driven orchestration \cite{repo_readme_framework,repo_makefile_pipeline}.
 
 From a software-engineering perspective, the project follows a \emph{separation-of-concerns} principle: each stage in the workflow has a narrowly defined responsibility and communicates with subsequent stages through persisted artifacts rather than hidden in-memory state. This is consistent with established best practices in scientific computing, where modularity, automation, and explicit intermediate products are central to reproducibility and long-term maintainability \cite{wilson2014best,wilson2017good}. It is also particularly relevant for machine-learning systems, where tightly coupled code can introduce hidden dependencies, data leakage, and technical debt that are difficult to detect experimentally \cite{sculley2015debt}.
 
 \subsection{Pipeline Modularity as an Architectural Principle}
 
-The repository is organized around a clear top-level structure comprising \texttt{configs/}, \texttt{data/}, \texttt{src/}, \texttt{rules/}, \texttt{artifacts/}, \texttt{reports/}, and \texttt{edge/} directories, with a top-level \texttt{Makefile} used for orchestration \cite{repo_readme_ch61}. This structure reflects an explicit architectural distinction between:
+The repository is organized around a clear top-level structure comprising \texttt{configs/}, \texttt{data/}, \texttt{src/}, \texttt{rules/}, \texttt{artifacts/}, \texttt{reports/}, and \texttt{edge/} directories, with a top-level \texttt{Makefile} used for orchestration \cite{repo_readme_framework}. This structure reflects an explicit architectural distinction between:
 \begin{itemize}
 	\item \textbf{configuration} (\texttt{configs/}),
 	\item \textbf{input data} (\texttt{data/}),
@@ -35,7 +35,7 @@ This means that the pipeline is composed as a chain of deterministic artifact tr
 
 \subsection{Stage-Oriented Script Design in \texttt{src/}}
 
-The most visible implementation of modularity appears in the numbered Python scripts under \texttt{src/}. The numbering convention itself is significant. It imposes a readable execution logic and communicates intended pipeline order to the developer, reviewer, or future maintainer. In the current repository, the scripts are grouped conceptually into the following blocks \cite{repo_readme_ch61,repo_makefile_ch61}:
+The most visible implementation of modularity appears in the numbered Python scripts under \texttt{src/}. The numbering convention itself is significant. It imposes a readable execution logic and communicates intended pipeline order to the developer, reviewer, or future maintainer. In the current repository, the scripts are grouped conceptually into the following blocks \cite{repo_readme_framework,repo_makefile_pipeline}:
 \begin{itemize}
 	\item \textbf{00--02}: data engineering and preprocessing,
 	\item \textbf{03--05}: neural training, threshold calibration, and statistical detection,
@@ -48,7 +48,7 @@ This stage numbering provides two advantages. First, it makes the pipeline \emph
 
 \subsection{Makefile Orchestration and Workflow Automation}
 
-A particularly strong software-engineering choice in this project is the use of a top-level \texttt{Makefile} to orchestrate the pipeline \cite{repo_makefile_ch61}. Rather than requiring manual execution of many scripts in an error-prone sequence, the implementation defines named targets such as:
+A particularly strong software-engineering choice in this project is the use of a top-level \texttt{Makefile} to orchestrate the pipeline \cite{repo_makefile_pipeline}. Rather than requiring manual execution of many scripts in an error-prone sequence, the implementation defines named targets such as:
 \begin{itemize}
 	\item \texttt{make holidays},
 	\item \texttt{make preprocess},
@@ -134,7 +134,7 @@ The modular design extends beyond the primary anomaly-detection path. The reposi
 	\item additional thesis visuals,
 	\item report-table generation.
 \end{itemize}
-This is an important marker of maturity. Many academic prototypes stop at the point where a model produces predictions or anomaly flags. By contrast, the present implementation continues through evaluation, interpretation, and reporting, thereby reducing what identifies as a common weakness in academic ML systems: incomplete and poorly reproducible pipelines \cite{abeysekara2025report}.
+This is an important marker of maturity. Many academic prototypes stop at the point where a model produces predictions or anomaly flags. By contrast, the present implementation continues through evaluation, interpretation, and reporting, thereby reducing what identifies as a common weakness in academic ML systems: incomplete and poorly reproducible pipelines.
 
 From a systems viewpoint, this means the project is not simply an experiment script repository. It is an integrated analytical workflow in which raw data, trained models, anomaly outputs, symbolic reasoning, utility mapping, benchmark tables, and publication-ready visuals are all generated within one coherent software architecture.
 
@@ -188,19 +188,19 @@ In summary, the software-engineering aspect of the thesis is not a secondary imp
 \section{Edge Feasibility}
 \label{sec:edge_feasibility}
 
-Edge feasibility is a central design objective of the proposed framework rather than a secondary implementation convenience. The thesis does not aim only to detect anomalies accurately; it also aims to do so with a computational footprint compatible with resource-constrained deployment settings. This objective is explicitly motivated and which argues that many powerful time-series anomaly detectors are difficult to operationalize in edge-like environments because they are too heavy, too unstable, or too dependent on large training and inference stacks \cite{abeysekara2025report}. In contrast, the dCeNN--ELM design is intentionally lightweight: representation learning is compact, the prediction head is analytical rather than iteratively optimized at inference time, and the final deployment bundle is exported into a minimal NumPy-based runtime rather than a full PyTorch dependency chain \cite{repo_readme_ch62,repo_edge_export_ch62}.
+Edge feasibility is a central design objective of the proposed framework rather than a secondary implementation convenience. The thesis does not aim only to detect anomalies accurately; it also aims to do so with a computational footprint compatible with resource-constrained deployment settings. This objective is explicitly motivated and which argues that many powerful time-series anomaly detectors are difficult to operationalize in edge-like environments because they are too heavy, too unstable, or too dependent on large training and inference stacks. In contrast, the dCeNN--ELM design is intentionally lightweight: representation learning is compact, the prediction head is analytical rather than iteratively optimized at inference time, and the final deployment bundle is exported into a minimal NumPy-based runtime rather than a full PyTorch dependency chain \cite{repo_readme_framework,repo_edge_export_ch62}.
 
 From a systems perspective, edge feasibility in this thesis has three dimensions:
 \begin{enumerate}
 	\item \textbf{computational feasibility}, meaning that the forecasting core can execute with modest CPU and memory resources;
 	\item \textbf{software feasibility}, meaning that the runtime stack on the target device is minimal and does not depend on heavyweight ML frameworks;
-	\item \textbf{deployment feasibility}, meaning that the trained model can be exported into a compact and reproducible artifact suitable for transfer to hardware such as a Raspberry Pi, Jetson-class device, or lightweight gateway \cite{repo_readme_ch62}.
+	\item \textbf{deployment feasibility}, meaning that the trained model can be exported into a compact and reproducible artifact suitable for transfer to hardware such as a Raspberry Pi, Jetson-class device, or lightweight gateway \cite{repo_readme_framework}.
 \end{enumerate}
 This section explains how the implementation substantiates those claims through its hardware-reporting practice and through the design of the edge export mechanism in \texttt{src/09\_edge\_export.py}.
 
 \subsection{Hardware and Environment Transparency}
 
-A strong claim about edge feasibility requires not only model design, but also transparent reporting of the environment in which the measurements were taken. Therefore, this can describes as a dedicated hardware-reporting practice in which the system records operating-system, CPU, RAM, Python version, and key library information so that benchmark numbers can be interpreted in context \cite{abeysekara2025report}. In the current report, the benchmark runs are stated to have been executed on GitHub Codespaces with approximately \textbf{2 vCPU} and \textbf{7.8 GiB RAM}, and the benchmark protocol explicitly forces CPU inference in order to preserve fairness and to reflect the edge-readiness objective of the study \cite{abeysekara2025report}.
+A strong claim about edge feasibility requires not only model design, but also transparent reporting of the environment in which the measurements were taken. Therefore, this can describes as a dedicated hardware-reporting practice in which the system records operating-system, CPU, RAM, Python version, and key library information so that benchmark numbers can be interpreted in context. In the current report, the benchmark runs are stated to have been executed on GitHub Codespaces with approximately \textbf{2 vCPU} and \textbf{7.8 GiB RAM}, and the benchmark protocol explicitly forces CPU inference in order to preserve fairness and to reflect the edge-readiness objective of the study.
 
 This reporting logic is important because performance claims in ML systems are often difficult to interpret when the hardware context is unspecified. In an edge-oriented thesis, latency or model-size numbers have little value unless they are tied to a concrete execution environment. The role of the hardware report, represented in the thesis discussion by the \texttt{system\_hardware\_report.txt} artifact, is therefore methodological as much as technical: it documents the computational envelope within which the benchmark and export claims should be understood.
 
@@ -319,7 +319,7 @@ In deployment terms, the ELM head therefore acts as a compression of forecasting
 
 \subsection{CPU-First Feasibility and Edge-Oriented Benchmark Interpretation}
 
-The benchmark discussion is also important for interpreting edge feasibility. The reported environment of roughly \textbf{2 vCPU} and \textbf{7.8 GiB RAM} is not itself an embedded microcontroller setting, but it is a deliberately CPU-constrained and GPU-free benchmarking environment \cite{abeysekara2025report}. That matters because the thesis claim is not that the model runs on a sub-milliwatt MCU; rather, it claims that the design is \emph{CPU-first}, \emph{lightweight}, and \emph{deployable on modest edge hardware}.
+The benchmark discussion is also important for interpreting edge feasibility. The reported environment of roughly \textbf{2 vCPU} and \textbf{7.8 GiB RAM} is not itself an embedded microcontroller setting, but it is a deliberately CPU-constrained and GPU-free benchmarking environment. That matters because the thesis claim is not that the model runs on a sub-milliwatt MCU; rather, it claims that the design is \emph{CPU-first}, \emph{lightweight}, and \emph{deployable on modest edge hardware}.
 
 This is a reasonable and academically defensible claim. In the current edge-AI literature, there is a wide continuum between heavy cloud inference and ultra-constrained TinyML microcontrollers \cite{antonini2023tinyml}. The proposed model sits in the practical middle: it is intentionally much lighter than many deep recurrent or Transformer systems, yet still expressive enough for multivariate forecasting under weather uncertainty. The export script and pure NumPy runtime make that middle-ground position concrete.
 
@@ -346,7 +346,7 @@ In summary, edge feasibility in this thesis is achieved through a combination of
 \section{Hyperparameter Optimization}
 \label{sec:hyperparameter_optimization}
 
-The proposed framework does not treat hyperparameters as scattered implementation details hidden inside scripts. Instead, hyperparameter control is elevated to a first-class software and experimental-design concern through a YAML-driven configuration system. This design is methodologically important because the thesis evaluates not a single model instance, but a complete neuro-symbolic pipeline whose behaviour depends on interacting choices in data preprocessing, neural architecture, regularization, threshold calibration, and deployment export. A configuration-driven strategy makes these choices explicit, reproducible, and easy to revise across controlled experiments \cite{abeysekara2025report,repo_base_cfg_ch63,repo_dcenn_cfg_ch63,repo_elm_cfg_ch63,repo_thresholds_cfg_ch63,repo_features_cfg_ch63}.
+The proposed framework does not treat hyperparameters as scattered implementation details hidden inside scripts. Instead, hyperparameter control is elevated to a first-class software and experimental-design concern through a YAML-driven configuration system. This design is methodologically important because the thesis evaluates not a single model instance, but a complete neuro-symbolic pipeline whose behaviour depends on interacting choices in data preprocessing, neural architecture, regularization, threshold calibration, and deployment export. A configuration-driven strategy makes these choices explicit, reproducible, and easy to revise across controlled experiments \cite{repo_base_config,repo_dcenn_config,repo_elm_config,repo_thresholds_config,repo_features_cfg_ch63}.
 
 A careful distinction is necessary here. In the broad machine-learning literature, \emph{hyperparameter optimization} often refers to automated search procedures such as grid search, random search, or Bayesian optimization \cite{bergstra2012random}. The present thesis adopts a more lightweight and engineering-oriented regime. It does not implement a separate black-box optimization engine. Instead, it performs \emph{controlled hyperparameter optimization through externalized configuration management}. In practice, this means that the relevant hyperparameters are centralized in YAML files, loaded consistently by the pipeline scripts, and adjusted through validation-driven experimentation under a stable workflow. 
 
@@ -371,19 +371,19 @@ YAML-based configuration is especially suitable here because it separates \emph{
 The repository organizes major hyperparameter families into dedicated YAML files under \texttt{configs/}. Each file serves a different layer of the system.
 
 \paragraph{Base configuration (\texttt{base.yaml}).}
-This file defines global data paths, the engineered dataset path, the holiday CSV path, the target NPZ artifact path, the chronological split boundaries, and the forecast horizon \cite{repo_base_cfg_ch63}. In effect, it controls the global experimental frame within which all other hyperparameters are interpreted.
+This file defines global data paths, the engineered dataset path, the holiday CSV path, the target NPZ artifact path, the chronological split boundaries, and the forecast horizon \cite{repo_base_config}. In effect, it controls the global experimental frame within which all other hyperparameters are interpreted.
 
 \paragraph{Feature configuration (\texttt{features.yaml}).}
 This file controls the supervised-feature construction regime: lag offsets, rolling windows, and winsorized columns \cite{repo_features_cfg_ch63}. These settings determine the temporal receptive field of the forecasting model and the robustness of the feature representation against extreme raw values.
 
 \paragraph{dCeNN configuration (\texttt{dcenn.yaml}).}
-This file defines the core encoder hyperparameters: latent dimension (\texttt{enc\_dim}), recurrent steps (\texttt{steps}), block size (\texttt{block}), autoencoder epochs (\texttt{ae\_epochs}), learning rate, weight decay, optional subsampling, and random seed \cite{repo_dcenn_cfg_ch63}. These parameters govern model capacity, training cost, and latent-structure regularization.
+This file defines the core encoder hyperparameters: latent dimension (\texttt{enc\_dim}), recurrent steps (\texttt{steps}), block size (\texttt{block}), autoencoder epochs (\texttt{ae\_epochs}), learning rate, weight decay, optional subsampling, and random seed \cite{repo_dcenn_config}. These parameters govern model capacity, training cost, and latent-structure regularization.
 
 \paragraph{ELM configuration (\texttt{elm.yaml}).}
-This file contains the ridge regularization parameter \texttt{l2} for the analytical forecasting head \cite{repo_elm_cfg_ch63}. Although minimal, it is conceptually important because it controls the bias--variance trade-off in the closed-form output layer.
+This file contains the ridge regularization parameter \texttt{l2} for the analytical forecasting head \cite{repo_elm_config}. Although minimal, it is conceptually important because it controls the bias--variance trade-off in the closed-form output layer.
 
 \paragraph{Threshold configuration (\texttt{thresholds.yaml}).}
-This file governs the anomaly calibration stage through the thresholding method, confidence level, and bucketing scheme, e.g., \texttt{method = conformal}, \texttt{alpha = 0.90}, and \texttt{bucket\_by = hour} \cite{repo_thresholds_cfg_ch63}. These parameters determine how residual uncertainty is translated into anomaly decisions.
+This file governs the anomaly calibration stage through the thresholding method, confidence level, and bucketing scheme, e.g., \texttt{method = conformal}, \texttt{alpha = 0.90}, and \texttt{bucket\_by = hour} \cite{repo_thresholds_config}. These parameters determine how residual uncertainty is translated into anomaly decisions.
 
 This configuration decomposition is a strong engineering choice because it prevents unrelated hyperparameters from being mixed in one large file. It also mirrors the conceptual decomposition of the thesis: data, features, neural architecture, output regularization, and detection calibration are each treated as distinct control surfaces.
 
@@ -416,7 +416,7 @@ This formalization makes clear that the project does not have a single monolithi
 
 \subsection{Base and Data-Split Hyperparameters}
 
-The \texttt{base.yaml} file is the root configuration layer of the project \cite{repo_base_cfg_ch63}. It specifies:
+The \texttt{base.yaml} file is the root configuration layer of the project \cite{repo_base_config}. It specifies:
 \begin{itemize}
 	\item the engineered dataset path,
 	\item the holiday CSV path,
@@ -441,7 +441,7 @@ The existence of a dedicated feature-configuration file is therefore an importan
 
 \subsection{dCeNN Hyperparameters and Capacity Control}
 
-The dCeNN encoder is the most structurally rich component of the neural pipeline, and its hyperparameters are appropriately externalized in \texttt{dcenn.yaml} \cite{repo_dcenn_cfg_ch63}. The main parameters are:
+The dCeNN encoder is the most structurally rich component of the neural pipeline, and its hyperparameters are appropriately externalized in \texttt{dcenn.yaml} \cite{repo_dcenn_config}. The main parameters are:
 \begin{itemize}
 	\item \texttt{enc\_dim = 48}: latent embedding dimension,
 	\item \texttt{steps = 2}: number of masked recurrent refinement steps,
@@ -465,7 +465,7 @@ This configuration-driven design is especially valuable because it keeps archite
 
 \subsection{ELM and Threshold Hyperparameters}
 
-Compared with the dCeNN encoder, the ELM head is deliberately simple. Its main tunable parameter is the ridge regularization constant \texttt{l2} in \texttt{elm.yaml} \cite{repo_elm_cfg_ch63}. Even though this is only one scalar, it plays an important role. If the value is too small, the analytical head may overfit the latent design matrix; if too large, it may underfit and wash out useful nonlinear structure encoded by the dCeNN. The advantage of keeping this hyperparameter isolated in its own YAML file is clarity: the output-layer regularization policy can be changed independently of the encoder design.
+Compared with the dCeNN encoder, the ELM head is deliberately simple. Its main tunable parameter is the ridge regularization constant \texttt{l2} in \texttt{elm.yaml} \cite{repo_elm_config}. Even though this is only one scalar, it plays an important role. If the value is too small, the analytical head may overfit the latent design matrix; if too large, it may underfit and wash out useful nonlinear structure encoded by the dCeNN. The advantage of keeping this hyperparameter isolated in its own YAML file is clarity: the output-layer regularization policy can be changed independently of the encoder design.
 
 The thresholding stage is also hyperparameterized through its own configuration file. In \texttt{thresholds.yaml}, the current implementation sets:
 \begin{itemize}
@@ -473,11 +473,11 @@ The thresholding stage is also hyperparameterized through its own configuration 
 	\item \texttt{alpha = 0.90},
 	\item \texttt{bucket\_by = hour}.
 \end{itemize}
-These choices govern how validation residuals are converted into anomaly thresholds \cite{repo_thresholds_cfg_ch63}. They are especially important in a weather-driven anomaly-detection system because threshold policy strongly affects the density, timing, and trustworthiness of anomaly candidates. Again, centralizing these values in a dedicated file allows threshold experimentation without rewriting detection code.
+These choices govern how validation residuals are converted into anomaly thresholds \cite{repo_thresholds_config}. They are especially important in a weather-driven anomaly-detection system because threshold policy strongly affects the density, timing, and trustworthiness of anomaly candidates. Again, centralizing these values in a dedicated file allows threshold experimentation without rewriting detection code.
 
 \subsection{Script-Level Consumption of YAML Configuration}
 
-The modularity of the YAML system is reinforced by the fact that individual scripts explicitly load only the configuration layers they need. For example, the training script \texttt{03\_train\_dcenn\_elm.py} loads \texttt{base.yaml}, \texttt{dcenn.yaml}, and \texttt{elm.yaml} at startup \cite{repo_train_dcenn_elm_ch63}. The threshold-calibration script \texttt{04\_calibrate\_thresholds.py} loads \texttt{base.yaml}, \texttt{features.yaml}, \texttt{thresholds.yaml}, and \texttt{dcenn.yaml} \cite{repo_calibrate_thresholds_ch63}. The edge-export script \texttt{09\_edge\_export.py} again loads \texttt{base.yaml} and \texttt{dcenn.yaml} in order to reconstruct the minimal inference bundle correctly \cite{repo_edge_export_ch63}.
+The modularity of the YAML system is reinforced by the fact that individual scripts explicitly load only the configuration layers they need. For example, the training script \texttt{03\_train\_dcenn\_elm.py} loads \texttt{base.yaml}, \texttt{dcenn.yaml}, and \texttt{elm.yaml} at startup \cite{repo_train_dcenn_elm}. The threshold-calibration script \texttt{04\_calibrate\_thresholds.py} loads \texttt{base.yaml}, \texttt{features.yaml}, \texttt{thresholds.yaml}, and \texttt{dcenn.yaml} \cite{repo_calibrate_thresholds_ch63}. The edge-export script \texttt{09\_edge\_export.py} again loads \texttt{base.yaml} and \texttt{dcenn.yaml} in order to reconstruct the minimal inference bundle correctly \cite{repo_edge_export_ch62}.
 
 This selective loading pattern is a strong implementation detail. It means configuration is not handled through one giant global object passed indiscriminately through the whole pipeline. Instead, each stage consumes only the subset of hyperparameters relevant to its role. This reduces coupling and makes the software easier to reason about.
 

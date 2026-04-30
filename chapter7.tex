@@ -264,7 +264,7 @@ The previous section showed that the ASP-based refinement layer reduces implausi
 
 This part of the evaluation is important because anomaly detection in isolation can be misleading. A detector that produces many raw alerts may appear highly sensitive, yet still perform poorly if those alerts lead to frequent penalty-bearing decisions. Conversely, a more selective detector may generate higher overall value if it preserves the most actionable events and suppresses low-quality triggers. The proposed neuro-symbolic framework is designed precisely for this trade-off: it narrows the anomaly set in order to improve the utility-to-penalty balance of the final signals.
 
-Within the repository, this financial interpretation is implemented through a finance-mapping stage that converts anomaly outcomes into utility-relevant event streams \cite{repo_finance_mapping}. The resulting backtest outputs are then summarized and visualized through the dedicated utility-comparison script and report-table generation pipeline \cite{repo_utility_comparison_plot,repo_finance_backtest,repo_report_tables}.
+Within the repository, this financial interpretation is implemented through a finance-mapping stage that converts anomaly outcomes into utility-relevant event streams \cite{repo_finance_mapping}. The resulting backtest outputs are then summarized and visualized through the dedicated utility-comparison script and report-table generation pipeline \cite{repo_utility_comparison,repo_finance_backtest,repo_report_tables}.
 
 \subsection{Utility Formulation}
 
@@ -288,7 +288,7 @@ where $U_{\mathrm{NS}}(T)$ denotes cumulative utility after ASP refinement and $
 
 \subsection{Cumulative Utility Over Time}
 
-The most direct way to assess financial usefulness is to inspect cumulative utility over the full evaluation horizon. The repository includes a dedicated plotting script, \texttt{src/23\_plot\_utility\_comparison.py}, which produces a temporal comparison of utility accumulation over time \cite{repo_utility_comparison_plot}. This figure is important because it shows whether the advantage of the refined signals is stable, temporary, or concentrated in specific periods of the year.
+The most direct way to assess financial usefulness is to inspect cumulative utility over the full evaluation horizon. The repository includes a dedicated plotting script, \texttt{src/23\_plot\_utility\_comparison.py}, which produces a temporal comparison of utility accumulation over time \cite{repo_utility_comparison}. This figure is important because it shows whether the advantage of the refined signals is stable, temporary, or concentrated in specific periods of the year.
 
 If the neuro-symbolic curve remains consistently above the raw neural curve, this indicates that the ASP refinement does more than remove anomalies: it improves the decision value of the retained signals. If the refined curve also exhibits fewer sharp downward movements, that would suggest that symbolic filtering successfully removes penalty-heavy false positives. In practical terms, a smoother and higher cumulative utility trajectory would mean that the refined anomaly stream is not only more selective, but more economically reliable.
 
@@ -305,7 +305,7 @@ The utility comparison indicates that the purely neural strategy outperforms the
 
 \subsection{Neural versus Neuro-Symbolic Utility Comparison}
 
-While the cumulative curve provides a temporal view, a direct aggregate comparison between the neural and neuro-symbolic variants is also necessary. The same utility-analysis pipeline provides a model-level comparison that contrasts the total financial outcome of the raw neural detector and the ASP-refined detector \cite{repo_utility_comparison_plot}. This figure should be interpreted as the clearest answer to the question of whether symbolic refinement adds practical value beyond anomaly filtering alone.
+While the cumulative curve provides a temporal view, a direct aggregate comparison between the neural and neuro-symbolic variants is also necessary. The same utility-analysis pipeline provides a model-level comparison that contrasts the total financial outcome of the raw neural detector and the ASP-refined detector \cite{repo_utility_comparison}. This figure should be interpreted as the clearest answer to the question of whether symbolic refinement adds practical value beyond anomaly filtering alone.
 
 The key point here is that neuro-symbolic refinement may improve total utility even if it reduces the number of anomaly signals. In other words, the framework is not optimized for signal quantity, but for signal quality. A smaller signal set can still be superior if the removed anomalies are mostly penalty-generating false positives. This is exactly the expected behaviour of the proposed framework: retain anomalies that are persistent, plausible, and contextually supported, while removing those that are likely to reduce downstream value.
 

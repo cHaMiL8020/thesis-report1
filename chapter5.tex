@@ -2,7 +2,7 @@
 \section{Data Sources}
 \label{sec:data_sources}
 
-This thesis uses an engineered Austrian hourly multivariate electricity dataset spanning the period from January 2017 to December 2022 and indexed in Coordinated Universal Time (UTC). The dataset is designed to support anomaly detection for electricity markets and grid operations under weather uncertainty, and therefore combines two broad information classes: operational market--grid signals and exogenous meteorological drivers. In the implemented pipeline, these heterogeneous sources are consolidated into the engineered research table \texttt{AT\_engineered\_hourly.csv}, which serves as the principal data source for modeling, threshold calibration, anomaly detection, and subsequent symbolic refinement \cite{abeysekara2025report,repo_preprocess_features,repo_base_config}.
+This thesis uses an engineered Austrian hourly multivariate electricity dataset spanning the period from January 2017 to December 2022 and indexed in Coordinated Universal Time (UTC). The dataset is designed to support anomaly detection for electricity markets and grid operations under weather uncertainty, and therefore combines two broad information classes: operational market--grid signals and exogenous meteorological drivers. In the implemented pipeline, these heterogeneous sources are consolidated into the engineered research table \texttt{AT\_engineered\_hourly.csv}, which serves as the principal data source for modeling, threshold calibration, anomaly detection, and subsequent symbolic refinement \cite{repo_preprocess_features,repo_base_config}.
 
 Unlike a single-purpose forecasting dataset, the data foundation of this thesis is explicitly multi-source and anomaly-oriented. The objective is not merely to predict one scalar variable, but to model the joint behaviour of price, load, renewable generation, and weather-sensitive context. For this reason, the repository preprocessing stage does not treat the Austrian hourly data as a flat tabular file. Instead, it constructs the final modeling table by integrating four primary source layers \cite{entsoe_transparency,entsoe_installed_capacity,openmeteo_historical,python_holidays}:
 \begin{enumerate}
@@ -40,7 +40,7 @@ Within the repository implementation, these upstream data resources are aligned 
 
 \subsection{Dataset Provenance and Temporal Coverage}
 
-According to the repository implementation, the time horizon of the study is six full calendar years, from 2017-01-01 to 2022-12-31 23:00 UTC \cite{abeysekara2025report,repo_base_config}. This horizon is sufficiently long to capture seasonal structure, year-to-year variation, and changing weather conditions, while still preserving a realistic chronological split for training, calibration, and testing. In the current project configuration, the split is:
+According to the repository implementation, the time horizon of the study is six full calendar years, from 2017-01-01 to 2022-12-31 23:00 UTC \cite{repo_base_config}. This horizon is sufficiently long to capture seasonal structure, year-to-year variation, and changing weather conditions, while still preserving a realistic chronological split for training, calibration, and testing. In the current project configuration, the split is:
 \begin{itemize}
 	\item \textbf{Training period:} 2017--2020,
 	\item \textbf{Validation period:} 2021,
@@ -87,13 +87,13 @@ A second critical data source is the installed-capacity dataset, referenced in t
 	\mathrm{CF}_{\mathrm{Wind},t} = \frac{\mathrm{Wind\_MW}_t}{\mathrm{Wind\_Cap\_MW}_t}.
 	\label{eq:capacity_factors_data}
 \end{equation}
-The report notes that these capacity factors are clipped to a reasonable upper bound, which prevents unrealistic values from dominating downstream modeling \cite{abeysekara2025report}.
+The report notes that these capacity factors are clipped to a reasonable upper bound, which prevents unrealistic values from dominating downstream modeling.
 
 The inclusion of installed-capacity data is a substantive methodological choice. It means that renewable behaviour is modeled not only in absolute output terms, but also in normalized terms relative to the evolving annual generation fleet. This is particularly valuable for long-horizon studies such as 2017--2022, because changes in installed solar and wind capacity can otherwise distort anomaly interpretation. A high solar output in one year may reflect a different operational meaning in another year if the installed base has changed substantially. Capacity-factor normalization reduces this comparability problem.
 
 \subsection{Holiday Calendar as a Context Source}
 
-A third data source is the Austrian public-holiday table, generated separately and then consumed during preprocessing. The approach utilized explicitly emphasizes that holiday logic is part of the contextual representation of normality, especially because some low-load patterns are expected rather than abnormal on public holidays \cite{abeysekara2025report}. In the repository, the preprocessing stage loads the holiday CSV, normalizes dates, and adds three binary context fields:
+A third data source is the Austrian public-holiday table, generated separately and then consumed during preprocessing. The approach utilized explicitly emphasizes that holiday logic is part of the contextual representation of normality, especially because some low-load patterns are expected rather than abnormal on public holidays. In the repository, the preprocessing stage loads the holiday CSV, normalizes dates, and adds three binary context fields:
 \begin{itemize}
 	\item \texttt{is\_public\_holiday},
 	\item \texttt{is\_weekend},
@@ -165,7 +165,7 @@ In summary, the data foundation of this thesis consists of a multi-source Austri
 
 This section describes the feature-engineering strategy used to transform the raw Austrian hourly data sources into the structured multivariate representation consumed by the dCeNN--ELM forecasting backbone. To avoid repetition, the present section does not restate the full source provenance already introduced in Section~5.1. Instead, it focuses on the \emph{engineering logic} by which raw measurements are converted into context-rich explanatory variables suitable for forecasting-based anomaly detection.
 
-Within the proposed framework, feature engineering serves three purposes. First, it injects domain knowledge directly into the neural input space. Second, it makes the forecasting problem context-aware by encoding weather, calendar, and seasonal effects explicitly. Third, it reduces the risk that the anomaly detector will confuse expected contextual variation with genuine abnormality. This is particularly important in electricity-market and grid settings, where large shifts in load, price, wind, or solar generation may be completely normal under specific meteorological or calendar regimes \cite{abeysekara2025report,repo_preprocess_features}.
+Within the proposed framework, feature engineering serves three purposes. First, it injects domain knowledge directly into the neural input space. Second, it makes the forecasting problem context-aware by encoding weather, calendar, and seasonal effects explicitly. Third, it reduces the risk that the anomaly detector will confuse expected contextual variation with genuine abnormality. This is particularly important in electricity-market and grid settings, where large shifts in load, price, wind, or solar generation may be completely normal under specific meteorological or calendar regimes \cite{repo_preprocess_features}.
 
 At the implementation level, the feature-engineering process is distributed across two main scripts:
 \begin{itemize}
@@ -226,7 +226,7 @@ In the current implementation, both values are clipped to the interval $[0, 1.25
 
 The use of capacity factors has several methodological advantages. First, it normalizes renewable output by the generation base available in a given year, which is especially important when installed capacity changes over time. Second, it makes the modeling problem more stable across years by reducing scale drift. Third, it yields quantities that are physically interpretable and directly relevant to anomaly analysis. A drop in solar generation may not be meaningful in MW terms alone, but a drop in solar \emph{capacity factor} under strong radiation conditions is much more informative.
 
-This also emphasizes that the target space of the forecasting model includes both renewable capacity factors and operational variables such as load and price. Thus, the feature-engineering pipeline is aligned with the broader thesis philosophy: renewable behaviour should be modeled in a normalized weather-aware form rather than as raw production magnitude alone \cite{abeysekara2025report}.
+This also emphasizes that the target space of the forecasting model includes both renewable capacity factors and operational variables such as load and price. Thus, the feature-engineering pipeline is aligned with the broader thesis philosophy: renewable behaviour should be modeled in a normalized weather-aware form rather than as raw production magnitude alone.
 
 \subsection{Meteorological Variables and Derived Physical Proxies}
 
@@ -318,9 +318,9 @@ In summary, the engineered feature space is the first place where the thesis ope
 \section{Baseline Selection}
 \label{sec:baseline_selection}
 
-A rigorous experimental study requires baselines that are not only conventional in the literature, but also methodologically meaningful with respect to the contribution being claimed. In the present thesis, the proposed dCeNN--ELM architecture is not evaluated in isolation. It is explicitly compared against two benchmark families: a \emph{regularized linear model} in the form of Ridge Regression, and a \emph{deep sequential model} in the form of an LSTM baseline. This choice is deliberate. Together, the two baselines span a useful spectrum of modeling assumptions: Ridge Regression represents the strongest simple linear comparator on the engineered feature matrix, while LSTM represents a standard nonlinear sequential deep-learning baseline. The proposed model is positioned between these extremes: more expressive than a linear regressor, but more lightweight and deployment-conscious than a conventional recurrent network \cite{abeysekara2025report}.
+A rigorous experimental study requires baselines that are not only conventional in the literature, but also methodologically meaningful with respect to the contribution being claimed. In the present thesis, the proposed dCeNN--ELM architecture is not evaluated in isolation. It is explicitly compared against two benchmark families: a \emph{regularized linear model} in the form of Ridge Regression, and a \emph{deep sequential model} in the form of an LSTM baseline. This choice is deliberate. Together, the two baselines span a useful spectrum of modeling assumptions: Ridge Regression represents the strongest simple linear comparator on the engineered feature matrix, while LSTM represents a standard nonlinear sequential deep-learning baseline. The proposed model is positioned between these extremes: more expressive than a linear regressor, but more lightweight and deployment-conscious than a conventional recurrent network.
 
-The implementation approach defines the fairness protocol clearly: all models must use the same chronological splits, the same engineered feature foundation, the same leakage-safe preprocessing logic, and the same evaluation in original target units wherever relevant. In this way, baseline selection is not treated as an afterthought, but as an integral part of the scientific design \cite{abeysekara2025report}. The goal of the comparison is not merely to show that one model attains lower error than another. It is to determine whether the proposed neural backbone provides a credible trade-off among predictive quality, efficiency, edge-readiness, and downstream anomaly usefulness.
+The implementation approach defines the fairness protocol clearly: all models must use the same chronological splits, the same engineered feature foundation, the same leakage-safe preprocessing logic, and the same evaluation in original target units wherever relevant. In this way, baseline selection is not treated as an afterthought, but as an integral part of the scientific design. The goal of the comparison is not merely to show that one model attains lower error than another. It is to determine whether the proposed neural backbone provides a credible trade-off among predictive quality, efficiency, edge-readiness, and downstream anomaly usefulness.
 
 \subsection{Why Baselines Matter in This Thesis}
 
@@ -366,7 +366,7 @@ Second, Ridge Regression is well aligned with the forecasting-based framing of t
 
 Third, Ridge is computationally lightweight, which makes it an appropriate benchmark for the edge-efficiency narrative of the thesis. It serves as the lower-complexity anchor in the comparison space: if the proposed model is only marginally better than Ridge while being much more expensive, its practical merit becomes questionable. Conversely, if it offers clear forecasting or anomaly-relevance advantages while staying relatively lightweight, the case for the proposed architecture becomes stronger.
 
-The implementation explicitly describes Ridge Regression as ``Baseline A'' and frames it as a test of whether the dCeNN encoder provides meaningful nonlinear benefit beyond a strong regularized linear fit \cite{abeysekara2025report}. This is precisely the right role for Ridge in the current study.
+The implementation explicitly describes Ridge Regression as ``Baseline A'' and frames it as a test of whether the dCeNN encoder provides meaningful nonlinear benefit beyond a strong regularized linear fit. This is precisely the right role for Ridge in the current study.
 
 \subsection{Baseline B: LSTM as the Sequential Deep-Learning Reference Model}
 
@@ -397,7 +397,7 @@ Second, the LSTM baseline makes the efficiency argument meaningful. If the propo
 
 Third, the LSTM baseline respects the literature surveyed earlier in Chapter~3, where recurrent architectures were identified as one of the dominant deep-learning families for time-series anomaly detection and forecasting. Its inclusion therefore creates continuity between the literature review and the experimental design.
 
-The repository implementation also handles an important fairness detail: the LSTM scales the targets during training to stabilize optimization and inverse-transforms them for final reporting, ensuring that all comparisons remain in the original physical units of MW and EUR/MWh \cite{repo_lstm_benchmark,abeysekara2025report}. This is a sound experimental choice because it prevents the comparison from being distorted by training-scale artifacts.
+The repository implementation also handles an important fairness detail: the LSTM scales the targets during training to stabilize optimization and inverse-transforms them for final reporting, ensuring that all comparisons remain in the original physical units of MW and EUR/MWh \cite{repo_lstm_benchmark}. This is a sound experimental choice because it prevents the comparison from being distorted by training-scale artifacts.
 
 \subsection{Why These Two Baselines Are Complementary}
 
@@ -432,7 +432,7 @@ The strength of this baseline set lies in its interpretability. If the proposed 
 
 \subsection{Fair Comparison Protocol}
 
-Baseline selection is inseparable from fairness protocol. The implementation emphasizes that all models are compared under the same experimental conditions \cite{abeysekara2025report}. These conditions are central to the validity of the results:
+Baseline selection is inseparable from fairness protocol. The implementation emphasizes that all models are compared under the same experimental conditions. These conditions are central to the validity of the results:
 \begin{enumerate}
 	\item \textbf{Same chronological splits.} All models use the same train, validation, and test periods.
 	\item \textbf{Same engineered feature foundation.} The preprocessing stage builds a common supervised dataset artifact used across benchmarks.
@@ -467,7 +467,7 @@ The evaluation strategy adopted in this thesis is designed to reflect the actual
 	\item \textbf{financial utility}, to evaluate whether refined anomaly signals lead to more useful downstream decisions.
 \end{enumerate}
 
-This design moves beyond a narrow dependence on classification-style measures such as F1-score. In the present Austrian electricity dataset, there is no authoritative ground-truth anomaly annotation for each timestamp. Consequently, classical supervised anomaly metrics are not sufficient as the primary evaluation basis. Instead, the framework adopts a label-light, behaviour-oriented, and utility-aware evaluation stance, which is consistent with the repository implementation \cite{abeysekara2025report,repo_finance_backtest_ch54,repo_utility_plot_ch54}. In this sense, the question is not merely whether the model flags unusual points, but whether those flags correspond to coherent events, survive symbolic scrutiny, and improve downstream utility.
+This design moves beyond a narrow dependence on classification-style measures such as F1-score. In the present Austrian electricity dataset, there is no authoritative ground-truth anomaly annotation for each timestamp. Consequently, classical supervised anomaly metrics are not sufficient as the primary evaluation basis. Instead, the framework adopts a label-light, behaviour-oriented, and utility-aware evaluation stance, which is consistent with the repository implementation \cite{repo_finance_mapping,repo_utility_comparison}. In this sense, the question is not merely whether the model flags unusual points, but whether those flags correspond to coherent events, survive symbolic scrutiny, and improve downstream utility.
 
 \subsection{Why F1-Score Alone Is Inadequate}
 
@@ -598,7 +598,7 @@ In this thesis, veto analysis is therefore not a secondary reporting add-on. It 
 
 \subsection{Financial Utility as a Decision-Oriented Metric}
 
-The final and most distinctive evaluation layer concerns \emph{financial utility}. The repository includes a finance-aware backtesting module that maps detected anomalies to simple policy actions and computes a cumulative utility trajectory rather than stopping at anomaly counts alone \cite{repo_finance_backtest_ch54}. This is one of the strongest methodological steps in the thesis because it makes evaluation decision-oriented rather than merely descriptive.
+The final and most distinctive evaluation layer concerns \emph{financial utility}. The repository includes a finance-aware backtesting module that maps detected anomalies to simple policy actions and computes a cumulative utility trajectory rather than stopping at anomaly counts alone \cite{repo_finance_mapping}. This is one of the strongest methodological steps in the thesis because it makes evaluation decision-oriented rather than merely descriptive.
 
 At a high level, let $a_t$ denote the action taken at time $t$, $s_t$ the anomaly score, and $\ell_t$ the penalty associated with a poor directional or imbalance decision. Then utility can be expressed abstractly as
 \begin{equation}
@@ -611,7 +611,7 @@ At a high level, let $a_t$ denote the action taken at time $t$, $s_t$ the anomal
 	\right],
 	\label{eq:utility_general}
 \end{equation}
-where $g(\cdot)$ represents action-dependent gain based on price movement, $\beta$ is the anomaly bonus weight, and $\ell_t$ is the penalty term. In the implemented backtest, the decision policy is activated by anomaly-confirmed price conditions, incorporates an anomaly bonus weighted by the combined score, and subtracts an imbalance penalty when the predicted direction conflicts with the realized direction \cite{repo_finance_backtest_ch54}.
+where $g(\cdot)$ represents action-dependent gain based on price movement, $\beta$ is the anomaly bonus weight, and $\ell_t$ is the penalty term. In the implemented backtest, the decision policy is activated by anomaly-confirmed price conditions, incorporates an anomaly bonus weighted by the combined score, and subtracts an imbalance penalty when the predicted direction conflicts with the realized direction \cite{repo_finance_mapping}.
 
 The resulting evaluation includes:
 \begin{itemize}
@@ -621,7 +621,7 @@ The resulting evaluation includes:
 	\item \textbf{net utility comparison}, measuring whether the neuro-symbolic strategy improves over the purely neural baseline.
 \end{itemize}
 
-The comparison script in the repository explicitly contrasts a purely neural strategy against the neuro-symbolic refined strategy and visualizes the difference in cumulative utility and penalty reduction \cite{repo_utility_plot_ch54}. This makes utility not just a conceptual metric, but a direct empirical comparison axis.
+The comparison script in the repository explicitly contrasts a purely neural strategy against the neuro-symbolic refined strategy and visualizes the difference in cumulative utility and penalty reduction \cite{repo_utility_comparison}. This makes utility not just a conceptual metric, but a direct empirical comparison axis.
 
 From the perspective of the thesis, financial utility is not meant to claim a production-ready trading system. Rather, it serves as a \emph{downstream usefulness proxy}. It answers a more practical question than F1-score: does the anomaly detector produce signals that are more useful after symbolic refinement than before?
 

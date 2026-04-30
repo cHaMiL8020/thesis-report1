@@ -2,7 +2,7 @@
 \section{Framework Overview}
 \label{sec:framework_overview}
 
-This thesis implements an end-to-end neuro-symbolic anomaly detection pipeline for hourly Austrian electricity-market and grid data under weather uncertainty. At a high level, the framework transforms heterogeneous raw observations into increasingly structured representations \cite{abeysekara2025report,repo_readme_framework}:
+This thesis implements an end-to-end neuro-symbolic anomaly detection pipeline for hourly Austrian electricity-market and grid data under weather uncertainty. At a high level, the framework transforms heterogeneous raw observations into increasingly structured representations \cite{repo_readme_framework}:
 \FloatBarrier
 \begin{figure}[H]
 	\centering
@@ -13,7 +13,7 @@ This thesis implements an end-to-end neuro-symbolic anomaly detection pipeline f
 \FloatBarrier
 The logic of this design is consistent with the problem formulation established earlier in the thesis. The learning layer is responsible for estimating the expected multivariate behaviour of the system, while the symbolic layer is responsible for deciding whether statistically unusual deviations remain credible once physical, calendar, and market constraints are taken into account. In this sense, the methodology is not a simple sequence of scripts, but a staged transformation from raw measurements to interpretable and rule-consistent anomaly decisions.
 
- report describes the pipeline as three tightly coupled layers: a lightweight forecasting backbone based on a Tiny dCeNN encoder and an ELM-style ridge head, an uncertainty-aware residual detector calibrated on validation data, and an ASP-based symbolic repair or veto stage that refines anomaly candidates before downstream analysis. The repository operationalizes the same logic through a modular sequence of preprocessing, splitting, training, threshold calibration, statistical detection, ASP reasoning, finance mapping, evaluation, edge export, and visualization scripts \cite{abeysekara2025report,repo_makefile_pipeline}. Importantly, the Makefile executes ASP before finance mapping, which reflects the intended thesis design: anomaly candidates should first be filtered by domain reasoning and only then be passed to utility-oriented interpretation. This ordering is methodologically important because it makes rule consistency part of the anomaly pipeline itself rather than a cosmetic post-processing step.
+ report describes the pipeline as three tightly coupled layers: a lightweight forecasting backbone based on a Tiny dCeNN encoder and an ELM-style ridge head, an uncertainty-aware residual detector calibrated on validation data, and an ASP-based symbolic repair or veto stage that refines anomaly candidates before downstream analysis. The repository operationalizes the same logic through a modular sequence of preprocessing, splitting, training, threshold calibration, statistical detection, ASP reasoning, finance mapping, evaluation, edge export, and visualization scripts \cite{repo_makefile_pipeline}. Importantly, the Makefile executes ASP before finance mapping, which reflects the intended thesis design: anomaly candidates should first be filtered by domain reasoning and only then be passed to utility-oriented interpretation. This ordering is methodologically important because it makes rule consistency part of the anomaly pipeline itself rather than a cosmetic post-processing step.
 
 \subsection{Methodological Design Principles}
 
@@ -46,13 +46,13 @@ Together, these principles define the core methodological contribution of the th
 
 The first stage of the pipeline transforms heterogeneous raw sources into a single hourly feature table. According to the project description, the raw inputs consist of Austrian electricity-market and grid signals together with weather information and calendar context. In practice, the repository preprocessing step reads raw hourly power and price data, installed-capacity data, and weather variables, aligns them on a common UTC time index, and constructs the engineered dataset used throughout the rest of the workflow.
 
-This stage is more than basic cleaning. It is the point where domain structure is introduced into the learning problem. The preprocessing script computes installed-capacity-aware solar and wind capacity factors, derives cyclical calendar encodings for hour, day-of-week, and month, constructs meteorological proxies such as air density, 100\,m wind speed, photovoltaic proxy terms, and wind power proxy terms, and adds Austrian public-holiday, weekend, and special-day indicators \cite{abeysekara2025report}. The result is a feature space that contains both directly observed and physics-informed predictors, enabling the downstream model to learn how market and grid variables behave under changing exogenous conditions.
+This stage is more than basic cleaning. It is the point where domain structure is introduced into the learning problem. The preprocessing script computes installed-capacity-aware solar and wind capacity factors, derives cyclical calendar encodings for hour, day-of-week, and month, constructs meteorological proxies such as air density, 100\,m wind speed, photovoltaic proxy terms, and wind power proxy terms, and adds Austrian public-holiday, weekend, and special-day indicators. The result is a feature space that contains both directly observed and physics-informed predictors, enabling the downstream model to learn how market and grid variables behave under changing exogenous conditions.
 
 From a methodological perspective, this stage is essential because it defines what ``normality'' means for the neural forecaster. If the input representation omitted calendar and weather context, the model would confuse expected context-driven variation with abnormality. Thus, the first stage of the framework already contributes to anomaly quality by embedding explanatory context into the feature space.
 
 \subsection{Stage 2: Leakage-Safe Split, Supervised Framing, and Scaling}
 
-After feature construction, the pipeline converts the engineered hourly table into supervised learning matrices. The repository performs a strict chronological split into train, validation, and test periods and then creates lagged and rolling features over a selected core subset of variables. In the current implementation, these transformed inputs are saved to a compressed \texttt{NPZ} dataset that contains $X_{\text{train}}$, $X_{\text{val}}$, $X_{\text{test}}$, the corresponding multivariate targets, and metadata such as feature and target names. The fitted scaler is stored separately as \texttt{artifacts/scaler.npz} \cite{repo_split_scale,abeysekara2025report}.
+After feature construction, the pipeline converts the engineered hourly table into supervised learning matrices. The repository performs a strict chronological split into train, validation, and test periods and then creates lagged and rolling features over a selected core subset of variables. In the current implementation, these transformed inputs are saved to a compressed \texttt{NPZ} dataset that contains $X_{\text{train}}$, $X_{\text{val}}$, $X_{\text{test}}$, the corresponding multivariate targets, and metadata such as feature and target names. The fitted scaler is stored separately as \texttt{artifacts/scaler.npz} \cite{repo_split_scale}.
 
 Formally, let $\mathbf{x}_t \in \mathbb{R}^{d}$ denote the engineered feature vector at time $t$, and let the multivariate target vector be
 \begin{equation}
@@ -104,7 +104,7 @@ The combination of dCeNN and ELM therefore yields a neural forecaster that is ex
 
 \subsection{Stage 5: Residual Analysis and Statistical Anomaly Generation}
 
-Once the multivariate forecast $\hat{\mathbf{y}}_t$ is available, the framework computes residuals as the primary statistical signal for anomaly generation \cite{abeysekara2025report}:
+Once the multivariate forecast $\hat{\mathbf{y}}_t$ is available, the framework computes residuals as the primary statistical signal for anomaly generation:
 \begin{equation}
 	\mathbf{r}_t = \mathbf{y}_t - \hat{\mathbf{y}}_t.
 	\label{eq:framework_residuals}
@@ -179,7 +179,7 @@ In summary, the framework overview reveals the essential methodological philosop
 \section{The Neural Component}
 \label{sec:neural_component}
 
-The neural component of the proposed framework is responsible for learning a compact and context-aware model of normal multivariate grid--market behaviour. Its methodological role is not to classify anomalies directly, but to produce reliable forecasts of the expected target variables under prevailing operating conditions. Anomalies are then inferred from deviations between observed and predicted values in the next stage of the pipeline. This design choice is appropriate for the present thesis because large, clean anomaly labels are generally unavailable in electricity-market and grid data, whereas historical observations of mostly normal system behaviour are abundant \cite{abeysekara2025report}.
+The neural component of the proposed framework is responsible for learning a compact and context-aware model of normal multivariate grid--market behaviour. Its methodological role is not to classify anomalies directly, but to produce reliable forecasts of the expected target variables under prevailing operating conditions. Anomalies are then inferred from deviations between observed and predicted values in the next stage of the pipeline. This design choice is appropriate for the present thesis because large, clean anomaly labels are generally unavailable in electricity-market and grid data, whereas historical observations of mostly normal system behaviour are abundant.
 
 Architecturally, the neural component is deliberately lightweight. It combines three tightly coupled elements:
 \begin{enumerate}
@@ -241,7 +241,7 @@ The multivariate target vector is
 	\end{bmatrix}^{\top},
 	\label{eq:neural_targets}
 \end{equation}
-which in the current implementation corresponds to solar capacity factor, wind capacity factor, load, and price. The repository code exposes a horizon parameter in the supervised framing stage, while the present system primarily as a same-timestamp multivariate forecasting setup. The architecture is therefore best understood as \emph{horizon-ready}: its structure naturally supports shifted targets, even though the current thesis framing emphasizes the same-timestamp residual formulation \cite{abeysekara2025report,repo_split_scale}.
+which in the current implementation corresponds to solar capacity factor, wind capacity factor, load, and price. The repository code exposes a horizon parameter in the supervised framing stage, while the present system primarily as a same-timestamp multivariate forecasting setup. The architecture is therefore best understood as \emph{horizon-ready}: its structure naturally supports shifted targets, even though the current thesis framing emphasizes the same-timestamp residual formulation \cite{repo_split_scale}.
 
 From a methodological standpoint, this feature-engineering stage is critical. It embeds explanatory context directly into the neural input. Without weather and calendar information, the model would confuse expected context-driven variation with anomaly-generating deviation. Thus, feature engineering is not a peripheral preprocessing step; it is part of the anomaly-definition mechanism itself.
 
@@ -271,7 +271,7 @@ From a methodological standpoint, this feature-engineering stage is critical. It
 
 \subsection{The dCeNN Encoder as a Compact Representation Learner}
 
-After feature engineering, the first trainable element in the neural pipeline is the dCeNN encoder. It can characterizes this module as a lightweight Tiny dCeNN temporal encoder, while the repository implements it as a compact masked recurrent encoder trained through an autoencoding objective \cite{abeysekara2025report,repo_train_dcenn_elm}.
+After feature engineering, the first trainable element in the neural pipeline is the dCeNN encoder. It can characterizes this module as a lightweight Tiny dCeNN temporal encoder, while the repository implements it as a compact masked recurrent encoder trained through an autoencoding objective \cite{repo_train_dcenn_elm}.
 
 Conceptually, the encoder maps the supervised input $\tilde{\mathbf{x}}_t$ into a latent embedding $\mathbf{h}_t \in \mathbb{R}^{p}$:
 \begin{equation}
@@ -429,7 +429,7 @@ In summary, the neural component of the dCeNN--ELM--ASP framework is best unders
 \section{The Symbolic Component (ASP)}
 \label{sec:symbolic_component_asp}
 
-The symbolic component of the proposed framework is implemented through Answer Set Programming (ASP), which serves as the rule-aware reasoning layer of the overall neuro-symbolic pipeline. Its purpose is not to replace the neural forecaster, but to evaluate whether statistically flagged anomalies remain credible once domain constraints are taken into account. In the present thesis, the statistical detector produces candidate anomalies through residual exceedance, while the symbolic component acts as a structured filter, validator, and explanation mechanism. This stage is a \emph{neuro-symbolic veto/repair layer} that reduces false positives and improves plausibility, interpretability, and downstream utility \cite{abeysekara2025report}.
+The symbolic component of the proposed framework is implemented through Answer Set Programming (ASP), which serves as the rule-aware reasoning layer of the overall neuro-symbolic pipeline. Its purpose is not to replace the neural forecaster, but to evaluate whether statistically flagged anomalies remain credible once domain constraints are taken into account. In the present thesis, the statistical detector produces candidate anomalies through residual exceedance, while the symbolic component acts as a structured filter, validator, and explanation mechanism. This stage is a \emph{neuro-symbolic veto/repair layer} that reduces false positives and improves plausibility, interpretability, and downstream utility.
 
 This design is especially appropriate for electricity-market and grid data. Many statistical deviations are not operationally meaningful. A solar-related anomaly may be spurious if shortwave radiation is zero. A load deviation may be contextually explainable on a public holiday. A price anomaly may become more credible when supported by a simultaneous load anomaly. These cases illustrate a key methodological point: anomaly detection in energy systems is not only about measuring deviation, but also about interpreting deviation under rules, context, and domain constraints. ASP is used in this thesis precisely because it offers a declarative and non-monotonic formalism for that task \cite{gelfond1988stable,brewka2011asp,gebser2012answer,gebser2019multi}.
 
@@ -636,7 +636,7 @@ The central operational function of the symbolic component is the \emph{veto mec
 \end{itemize}
 The final refined anomaly table then stores, for each retained or rejected item, the target, timestamp, hour index, anomaly score, final flag, and veto indicator \cite{repo_asp_apply}.
 
-Methodologically, this veto mechanism addresses a specific weakness of purely statistical anomaly detection: the tendency to over-flag surprising points that are still physically plausible, contextually explainable, or economically trivial. This issue is identified as one of the main gaps in prior practice. The ASP stage is the thesis response to that gap. It reduces false positives not by tuning thresholds further, but by subjecting the flagged cases to domain-aware reasoning \cite{abeysekara2025report}.
+Methodologically, this veto mechanism addresses a specific weakness of purely statistical anomaly detection: the tendency to over-flag surprising points that are still physically plausible, contextually explainable, or economically trivial. This issue is identified as one of the main gaps in prior practice. The ASP stage is the thesis response to that gap. It reduces false positives not by tuning thresholds further, but by subjecting the flagged cases to domain-aware reasoning.
 
 This logic is also evident in the repository’s small debugging script, which manually injects a ``solar anomaly at night'' fact together with zero radiation and tests the rule base through \texttt{clingo} \cite{repo_debug_clingo}. Although minimal, this script illustrates the exact spirit of the symbolic component: anomaly claims should be testable against explicit logic rather than accepted as opaque outputs.
 
@@ -686,7 +686,7 @@ This is the central methodological significance of the symbolic layer. It is not
 \section{Hybrid Integration}
 \label{sec:hybrid_integration}
 
-The defining methodological contribution of the proposed framework lies not merely in the existence of both neural and symbolic components, but in the way they are integrated. The hybrid layer is the interface at which continuous multivariate predictions and residuals produced by the dCeNN--ELM forecaster are transformed into discrete symbolic evidence for Answer Set Programming. In other words, this stage explains how the pipeline moves from numerical anomaly scoring to rule-based anomaly validation. This transition is the movement from ML-generated anomaly candidates to an ASP-based \emph{repair/refinement layer} that confirms or suppresses those candidates using physical and market logic \cite{abeysekara2025report}.
+The defining methodological contribution of the proposed framework lies not merely in the existence of both neural and symbolic components, but in the way they are integrated. The hybrid layer is the interface at which continuous multivariate predictions and residuals produced by the dCeNN--ELM forecaster are transformed into discrete symbolic evidence for Answer Set Programming. In other words, this stage explains how the pipeline moves from numerical anomaly scoring to rule-based anomaly validation. This transition is the movement from ML-generated anomaly candidates to an ASP-based \emph{repair/refinement layer} that confirms or suppresses those candidates using physical and market logic.
 
 This integration point is central because the two subsystems operate over fundamentally different representations. The neural detector works in continuous Euclidean space. It consumes standardized lagged features, outputs multivariate forecasts, computes residuals, and applies calibrated thresholds. The ASP layer, by contrast, requires symbolic atoms such as \texttt{anomaly("price",t)} or \texttt{holiday(t)}. The hybrid integration stage is therefore not a trivial file conversion; it is a formal translation layer that preserves anomaly meaning while converting statistical evidence into a symbolic form that can be reasoned over declaratively.
 

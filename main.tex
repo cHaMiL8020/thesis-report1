@@ -22,7 +22,8 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{eurosym}
-
+\usepackage{etoolbox}
+\apptocmd{\thebibliography}{\raggedright}{}{}
 
 \lstdefinestyle{asprules}{
     basicstyle=\ttfamily\small,

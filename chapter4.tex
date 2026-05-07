@@ -2,7 +2,7 @@
 \section{Framework Overview}
 \label{sec:framework_overview}
 
-This thesis implements an end-to-end neuro-symbolic anomaly detection pipeline for hourly Austrian electricity-market and grid data under weather uncertainty. The complete implementation of the proposed framework is publicly available at \url{https://github.com/cHaMiL8020/thesis-grid-anomaly}. At a high level, the framework transforms heterogeneous raw observations into increasingly structured representations \cite{repo_readme_framework}:
+This thesis implements an end-to-end neuro-symbolic anomaly detection pipeline for hourly Austrian electricity-market and grid data under weather uncertainty. The complete implementation of the proposed framework is publicly available at \url{https://github.com/cHaMiL8020/thesis-grid-anomaly}. At a high level, the framework transforms heterogeneous raw observations into increasingly structured representations \cite{repo_thesis_grid_anomaly}:
 \FloatBarrier
 \begin{figure}[H]
 	\centering
@@ -13,7 +13,7 @@ This thesis implements an end-to-end neuro-symbolic anomaly detection pipeline f
 \FloatBarrier
 The logic of this design is consistent with the problem formulation established earlier in the thesis. The learning layer is responsible for estimating the expected multivariate behaviour of the system, while the symbolic layer is responsible for deciding whether statistically unusual deviations remain credible once physical, calendar, and market constraints are taken into account. In this sense, the methodology is not a simple sequence of scripts, but a staged transformation from raw measurements to interpretable and rule-consistent anomaly decisions.
 
- report describes the pipeline as three tightly coupled layers: a lightweight forecasting backbone based on a Tiny dCeNN encoder and an ELM-style ridge head, an uncertainty-aware residual detector calibrated on validation data, and an ASP-based symbolic repair or veto stage that refines anomaly candidates before downstream analysis. The repository operationalizes the same logic through a modular sequence of preprocessing, splitting, training, threshold calibration, statistical detection, ASP reasoning, finance mapping, evaluation, edge export, and visualization scripts \cite{repo_makefile_pipeline}. Importantly, the Makefile executes ASP before finance mapping, which reflects the intended thesis design: anomaly candidates should first be filtered by domain reasoning and only then be passed to utility-oriented interpretation. This ordering is methodologically important because it makes rule consistency part of the anomaly pipeline itself rather than a cosmetic post-processing step.
+ report describes the pipeline as three tightly coupled layers: a lightweight forecasting backbone based on a Tiny dCeNN encoder and an ELM-style ridge head, an uncertainty-aware residual detector calibrated on validation data, and an ASP-based symbolic repair or veto stage that refines anomaly candidates before downstream analysis. The repository operationalizes the same logic through a modular sequence of preprocessing, splitting, training, threshold calibration, statistical detection, ASP reasoning, finance mapping, evaluation, edge export, and visualization scripts \cite{repo_thesis_grid_anomaly}. Importantly, the Makefile executes ASP before finance mapping, which reflects the intended thesis design: anomaly candidates should first be filtered by domain reasoning and only then be passed to utility-oriented interpretation. This ordering is methodologically important because it makes rule consistency part of the anomaly pipeline itself rather than a cosmetic post-processing step.
 
 \subsection{Methodological Design Principles}
 
@@ -52,7 +52,7 @@ From a methodological perspective, this stage is essential because it defines wh
 
 \subsection{Stage 2: Leakage-Safe Split, Supervised Framing, and Scaling}
 
-After feature construction, the pipeline converts the engineered hourly table into supervised learning matrices. The repository performs a strict chronological split into train, validation, and test periods and then creates lagged and rolling features over a selected core subset of variables. In the current implementation, these transformed inputs are saved to a compressed \texttt{NPZ} dataset that contains $X_{\text{train}}$, $X_{\text{val}}$, $X_{\text{test}}$, the corresponding multivariate targets, and metadata such as feature and target names. The fitted scaler is stored separately as \texttt{artifacts/scaler.npz} \cite{repo_split_scale}.
+After feature construction, the pipeline converts the engineered hourly table into supervised learning matrices. The repository performs a strict chronological split into train, validation, and test periods and then creates lagged and rolling features over a selected core subset of variables. In the current implementation, these transformed inputs are saved to a compressed \texttt{NPZ} dataset that contains $X_{\text{train}}$, $X_{\text{val}}$, $X_{\text{test}}$, the corresponding multivariate targets, and metadata such as feature and target names. The fitted scaler is stored separately as \texttt{artifacts/scaler.npz} \cite{repo_thesis_grid_anomaly}.
 
 Formally, let $\mathbf{x}_t \in \mathbb{R}^{d}$ denote the engineered feature vector at time $t$, and let the multivariate target vector be
 \begin{equation}
@@ -129,7 +129,7 @@ At the framework-overview level, this stage can be understood as the statistical
 
 The final stage covered by this overview is the ASP-based symbolic veto \cite{gelfond1988stable,gebser2019multi}. The motivation is straightforward: not every statistical residual exceedance should be accepted as a meaningful anomaly. Some flagged events may be physically implausible, contextually explainable, or economically irrelevant. The framework therefore introduces a symbolic reasoning stage that refines the statistical output before it is passed further downstream.
 
-In implementation terms, the ASP script reads the anomaly table and the engineered feature table, converts selected quantities into symbolic facts, and invokes \texttt{clingo} over the rule base in \texttt{rules/market\_rules.lp} \cite{repo_detect_anomalies,repo_asp_apply,repo_market_rules}. The generated facts include anomaly indicators, holiday information, shortwave radiation, wind power, actual load, and a reference load baseline. The solver then returns two explicit categories:
+In implementation terms, the ASP script reads the anomaly table and the engineered feature table, converts selected quantities into symbolic facts, and invokes \texttt{clingo} over the rule base in \texttt{rules/market\_rules.lp} \cite{repo_thesis_grid_anomaly}. The generated facts include anomaly indicators, holiday information, shortwave radiation, wind power, actual load, and a reference load baseline. The solver then returns two explicit categories:
 \begin{itemize}
 	\item \texttt{valid\_anomaly} atoms, representing anomaly candidates that survive the rule base;
 	\item \texttt{vetoed} atoms, representing anomaly candidates rejected by symbolic logic.
@@ -203,7 +203,7 @@ Fourth, it must be \emph{modular and reproducible}. The input transformation, en
 
 \subsection{Feature Engineering and Supervised Representation}
 
-The neural pipeline begins not with the encoder, but with the construction of a supervised multivariate feature representation. In the repository implementation, the preprocessing and split pipeline create an engineered hourly table from aligned market, grid, weather, installed-capacity, and calendar sources, then convert it into lagged and rolling supervised matrices for downstream training \cite{repo_preprocess_features,repo_split_scale}.
+The neural pipeline begins not with the encoder, but with the construction of a supervised multivariate feature representation. In the repository implementation, the preprocessing and split pipeline create an engineered hourly table from aligned market, grid, weather, installed-capacity, and calendar sources, then convert it into lagged and rolling supervised matrices for downstream training \cite{repo_thesis_grid_anomaly}.
 
 Let $\mathbf{x}_t \in \mathbb{R}^{d_0}$ denote the engineered base feature vector at time $t$. The base representation includes several feature groups:
 \begin{itemize}
@@ -241,7 +241,7 @@ The multivariate target vector is
 	\end{bmatrix}^{\top},
 	\label{eq:neural_targets}
 \end{equation}
-which in the current implementation corresponds to solar capacity factor, wind capacity factor, load, and price. The repository code exposes a horizon parameter in the supervised framing stage, while the present system primarily as a same-timestamp multivariate forecasting setup. The architecture is therefore best understood as \emph{horizon-ready}: its structure naturally supports shifted targets, even though the current thesis framing emphasizes the same-timestamp residual formulation \cite{repo_split_scale}.
+which in the current implementation corresponds to solar capacity factor, wind capacity factor, load, and price. The repository code exposes a horizon parameter in the supervised framing stage, while the present system primarily as a same-timestamp multivariate forecasting setup. The architecture is therefore best understood as \emph{horizon-ready}: its structure naturally supports shifted targets, even though the current thesis framing emphasizes the same-timestamp residual formulation \cite{repo_thesis_grid_anomaly}.
 
 From a methodological standpoint, this feature-engineering stage is critical. It embeds explanatory context directly into the neural input. Without weather and calendar information, the model would confuse expected context-driven variation with anomaly-generating deviation. Thus, feature engineering is not a peripheral preprocessing step; it is part of the anomaly-definition mechanism itself.
 
@@ -271,7 +271,7 @@ From a methodological standpoint, this feature-engineering stage is critical. It
 
 \subsection{The dCeNN Encoder as a Compact Representation Learner}
 
-After feature engineering, the first trainable element in the neural pipeline is the dCeNN encoder. It can characterizes this module as a lightweight Tiny dCeNN temporal encoder, while the repository implements it as a compact masked recurrent encoder trained through an autoencoding objective \cite{repo_train_dcenn_elm}.
+After feature engineering, the first trainable element in the neural pipeline is the dCeNN encoder. It can characterizes this module as a lightweight Tiny dCeNN temporal encoder, while the repository implements it as a compact masked recurrent encoder trained through an autoencoding objective \cite{repo_thesis_grid_anomaly}.
 
 Conceptually, the encoder maps the supervised input $\tilde{\mathbf{x}}_t$ into a latent embedding $\mathbf{h}_t \in \mathbb{R}^{p}$:
 \begin{equation}
@@ -306,7 +306,7 @@ where $M$ is a binary block-diagonal mask and $\odot$ denotes element-wise multi
 	\qquad k=0,\dots,K-1,
 	\label{eq:dcenn_recurrence}
 \end{equation}
-where $\gamma$ is a residual mixing coefficient. In the actual training script, this coefficient is implemented as $0.3$, which provides stability-oriented residual mixing in each recurrent update \cite{repo_train_dcenn_elm}.
+where $\gamma$ is a residual mixing coefficient. In the actual training script, this coefficient is implemented as $0.3$, which provides stability-oriented residual mixing in each recurrent update \cite{repo_thesis_grid_anomaly}.
 
 \paragraph{Latent embedding.}
 After $K$ refinement steps, the final hidden state becomes the encoder output:
@@ -317,7 +317,7 @@ After $K$ refinement steps, the final hidden state becomes the encoder output:
 
 The dCeNN design is motivated by the theory of cellular neural computation, where local or structured connectivity is used instead of unrestricted dense recurrence \cite{chua1988cellular}. In the present implementation, locality is realized through the block-diagonal mask rather than through an explicit spatial lattice. This creates a structured latent transition matrix that is cheaper and more regularized than a fully connected recurrent matrix.
 
-The current default encoder configuration is defined in \texttt{configs/dcenn.yaml}: latent dimension \texttt{enc\_dim = 48}, recurrent steps \texttt{steps = 2}, block size \texttt{block = 8}, autoencoder training epochs \texttt{ae\_epochs = 3}, learning rate \texttt{lr = 0.001}, weight decay \texttt{1e-4}, and seed \texttt{42} \cite{repo_dcenn_config}. The training script additionally defaults the mini-batch size to $256$ if it is not explicitly specified in the YAML configuration \cite{repo_train_dcenn_elm}.
+The current default encoder configuration is defined in \texttt{configs/dcenn.yaml}: latent dimension \texttt{enc\_dim = 48}, recurrent steps \texttt{steps = 2}, block size \texttt{block = 8}, autoencoder training epochs \texttt{ae\_epochs = 3}, learning rate \texttt{lr = 0.001}, weight decay \texttt{1e-4}, and seed \texttt{42} \cite{repo_thesis_grid_anomaly}. The training script additionally defaults the mini-batch size to $256$ if it is not explicitly specified in the YAML configuration \cite{repo_thesis_grid_anomaly}.
 
 \subsection{Why the Encoder Is Trained as an Autoencoder}
 
@@ -336,7 +336,7 @@ The rationale is methodological as well as practical. By training the encoder to
 
 This is useful for three reasons. First, it decouples representation learning from the closed-form regression stage. Second, it keeps the encoder lightweight and stable. Third, it avoids the need for a fully backpropagated deep forecasting network, which would be more computationally expensive and less modular.
 
-At the end of training, only the \emph{encoder} is exported; the decoder is discarded because it is not needed at inference time. This directly explains the role of the repository artifact \texttt{artifacts/dcenn\_encoder.pt}: it is the serialized \texttt{state\_dict} of the trained dCeNN encoder only, not of the full temporary autoencoder \cite{repo_train_dcenn_elm}. In other words, \texttt{dcenn\_encoder.pt} is the deployable representation-learning artifact of the neural component.
+At the end of training, only the \emph{encoder} is exported; the decoder is discarded because it is not needed at inference time. This directly explains the role of the repository artifact \texttt{artifacts/dcenn\_encoder.pt}: it is the serialized \texttt{state\_dict} of the trained dCeNN encoder only, not of the full temporary autoencoder \cite{repo_thesis_grid_anomaly}. In other words, \texttt{dcenn\_encoder.pt} is the deployable representation-learning artifact of the neural component.
 
 \subsection{The ELM Ridge Head as the Forecasting Layer}
 
@@ -369,14 +369,14 @@ where $W \in \mathbb{R}^{p \times m}$ is the output weight matrix and $\lambda$ 
 	\label{eq:elm_prediction_ch42}
 \end{equation}
 
-The current default value of the ridge parameter is set in \texttt{configs/elm.yaml} as \texttt{l2 = 0.01} \cite{repo_elm_config}. This is methodologically attractive because it provides regularized closed-form fitting without iterative gradient descent. Training the head therefore reduces to solving one linear system rather than running an epoch-based optimization loop. That property is especially valuable for reproducibility and CPU-oriented deployment.
+The current default value of the ridge parameter is set in \texttt{configs/elm.yaml} as \texttt{l2 = 0.01} \cite{repo_thesis_grid_anomaly}. This is methodologically attractive because it provides regularized closed-form fitting without iterative gradient descent. Training the head therefore reduces to solving one linear system rather than running an epoch-based optimization loop. That property is especially valuable for reproducibility and CPU-oriented deployment.
 
 The corresponding deployable repository artifact is \texttt{artifacts/elm\_heads.npz}. According to the training script, this file stores two core elements:
 \begin{itemize}
 	\item the learned ridge-regression weight matrix $W$;
 	\item the ordered list of target names associated with the output dimensions.
 \end{itemize}
-This means that \texttt{elm\_heads.npz} is the complete deployable forecasting head. During inference, the model only needs the encoder embedding $\mathbf{H}_t$ and this stored weight matrix to generate multivariate predictions \cite{repo_train_dcenn_elm}.
+This means that \texttt{elm\_heads.npz} is the complete deployable forecasting head. During inference, the model only needs the encoder embedding $\mathbf{H}_t$ and this stored weight matrix to generate multivariate predictions \cite{repo_thesis_grid_anomaly}.
 
 \subsection{End-to-End Neural Forward Path}
 
@@ -442,7 +442,7 @@ At the system level, the symbolic component receives the outputs of the neural r
 \end{equation}
 where $\mathbf{s}_t$ denotes the symbolic context associated with the timestamp, such as holiday status, radiation level, wind generation, or load reference. The refined anomaly $\tilde{a}_t^{(j)}$ is therefore not merely a statistical exceedance; it is a statistical exceedance that also survives domain-level reasoning.
 
-In the repository, this logic is implemented in \texttt{src/07\_apply\_asp.py}, which reads the anomaly table produced by the detection stage, generates symbolic facts from both the anomaly outputs and the engineered data, invokes \texttt{clingo}, and writes a refined anomaly table containing confirmed and vetoed cases \cite{repo_asp_apply}. The associated rule base is implemented in \texttt{rules/market\_rules.lp} \cite{repo_market_rules}. Although the user prompt refers to \texttt{07\_asp\_rules.lp}, the current repository operationalizes the same symbolic role through \texttt{market\_rules.lp}; this file is the actual ASP knowledge base used by the pipeline.
+In the repository, this logic is implemented in \texttt{src/07\_apply\_asp.py}, which reads the anomaly table produced by the detection stage, generates symbolic facts from both the anomaly outputs and the engineered data, invokes \texttt{clingo}, and writes a refined anomaly table containing confirmed and vetoed cases \cite{repo_thesis_grid_anomaly}. The associated rule base is implemented in \texttt{rules/market\_rules.lp} \cite{repo_thesis_grid_anomaly}. Although the user prompt refers to \texttt{07\_asp\_rules.lp}, the current repository operationalizes the same symbolic role through \texttt{market\_rules.lp}; this file is the actual ASP knowledge base used by the pipeline.
 
 \subsection{Knowledge Engineering: From Domain Knowledge to Logic Rules}
 
@@ -481,7 +481,7 @@ In the present thesis, ASP is used in a \emph{post-detection declarative reasoni
 
 \subsection{Fact Generation: Translating Continuous Data into Symbolic Atoms}
 
-Because ASP operates on symbolic atoms rather than raw floating-point vectors, the first step in the symbolic component is to convert selected parts of the anomaly table and engineered data into facts. In the repository implementation, this happens in the helper function \texttt{\_generate\_facts(...)} inside \texttt{src/07\_apply\_asp.py} \cite{repo_asp_apply}. Each timestamp is first mapped to an integer hour index since the Unix epoch:
+Because ASP operates on symbolic atoms rather than raw floating-point vectors, the first step in the symbolic component is to convert selected parts of the anomaly table and engineered data into facts. In the repository implementation, this happens in the helper function \texttt{\_generate\_facts(...)} inside \texttt{src/07\_apply\_asp.py} \cite{repo_thesis_grid_anomaly}. Each timestamp is first mapped to an integer hour index since the Unix epoch:
 \begin{equation}
 	t = \left\lfloor \frac{\mathrm{timestamp\_utc}}{3600} \right\rfloor,
 	\label{eq:hour_index}
@@ -552,7 +552,7 @@ The \texttt{load\_ref} signal is especially interesting because it is not a raw 
 
 \subsection{The ASP Rule Base: Logic Families and Their Meaning}
 
-The current rule base in \texttt{rules/market\_rules.lp} is intentionally compact but methodologically rich \cite{repo_market_rules}. It defines five main rule families.
+The current rule base in \texttt{rules/market\_rules.lp} is intentionally compact but methodologically rich \cite{repo_thesis_grid_anomaly}. It defines five main rule families.
 
 \paragraph{1. Persistence filter.}
 The first rule family encodes the idea that isolated anomalies are less trustworthy than persistent ones:
@@ -584,7 +584,7 @@ This rule expresses the intuitive principle that a solar anomaly is not operatio
 	&\ |V1 - V0| > \texttt{wind\_ramp\_limit}.
 	\label{eq:wind_ramp_rule}
 \end{align}
-Here, the constant \texttt{wind\_ramp\_limit} is set to 500 in the rule file \cite{repo_market_rules}. This gives the rule base a concrete sanity bound.
+Here, the constant \texttt{wind\_ramp\_limit} is set to 500 in the rule file \cite{repo_thesis_grid_anomaly}. This gives the rule base a concrete sanity bound.
 
 \paragraph{3. Co-anomaly market logic.}
 The third family captures a simple but important market-oriented relation:
@@ -634,11 +634,11 @@ The central operational function of the symbolic component is the \emph{veto mec
 	\item a list of \texttt{valid\_anomaly(target, hour)} atoms;
 	\item a list of \texttt{vetoed(target, hour)} atoms.
 \end{itemize}
-The final refined anomaly table then stores, for each retained or rejected item, the target, timestamp, hour index, anomaly score, final flag, and veto indicator \cite{repo_asp_apply}.
+The final refined anomaly table then stores, for each retained or rejected item, the target, timestamp, hour index, anomaly score, final flag, and veto indicator \cite{repo_thesis_grid_anomaly}.
 
 Methodologically, this veto mechanism addresses a specific weakness of purely statistical anomaly detection: the tendency to over-flag surprising points that are still physically plausible, contextually explainable, or economically trivial. This issue is identified as one of the main gaps in prior practice. The ASP stage is the thesis response to that gap. It reduces false positives not by tuning thresholds further, but by subjecting the flagged cases to domain-aware reasoning.
 
-This logic is also evident in the repository’s small debugging script, which manually injects a ``solar anomaly at night'' fact together with zero radiation and tests the rule base through \texttt{clingo} \cite{repo_debug_clingo}. Although minimal, this script illustrates the exact spirit of the symbolic component: anomaly claims should be testable against explicit logic rather than accepted as opaque outputs.
+This logic is also evident in the repository’s small debugging script, which manually injects a ``solar anomaly at night'' fact together with zero radiation and tests the rule base through \texttt{clingo} \cite{repo_thesis_grid_anomaly}. Although minimal, this script illustrates the exact spirit of the symbolic component: anomaly claims should be testable against explicit logic rather than accepted as opaque outputs.
 
 \subsection{Interpretability, Modularity, and Limits of the ASP Layer}
 
@@ -706,15 +706,15 @@ The present framework answers these questions in a particularly disciplined way.
 
 The repository implements the neural-to-symbolic handoff through a pair of consecutive scripts:
 \begin{enumerate}
-	\item \texttt{src/05\_detect\_anomalies.py}, which reconstructs the supervised test set, loads the trained neural artifacts, computes predictions and residuals, applies calibrated thresholds, and writes a full anomaly table \cite{repo_detect_anomalies};
-	\item \texttt{src/07\_apply\_asp.py}, which reads that anomaly table together with the engineered feature table, converts selected values into facts, runs \texttt{clingo}, and writes the refined anomaly table \cite{repo_asp_apply}.
+	\item \texttt{src/05\_detect\_anomalies.py}, which reconstructs the supervised test set, loads the trained neural artifacts, computes predictions and residuals, applies calibrated thresholds, and writes a full anomaly table \cite{repo_thesis_grid_anomaly};
+	\item \texttt{src/07\_apply\_asp.py}, which reads that anomaly table together with the engineered feature table, converts selected values into facts, runs \texttt{clingo}, and writes the refined anomaly table \cite{repo_thesis_grid_anomaly}.
 \end{enumerate}
 
 This arrangement is methodologically clean because it makes the anomaly table the explicit interface object between the subsystems. The neural component does not call the ASP solver directly in-memory. Instead, it produces a reproducible artifact that can be inspected, audited, plotted, or reprocessed independently. This improves transparency and scientific traceability.
 
 \subsection{Stage 1: Residual-Based Statistical Evidence from the Neural Component}
 
-The first half of the hybrid integration is the construction of the neural anomaly table. In \texttt{src/05\_detect\_anomalies.py}, the trained encoder, ridge head, scaler, and threshold artifacts are reloaded, and the supervised test matrix is rebuilt from the engineered CSV using the same lag and rolling configuration used earlier in the pipeline \cite{repo_detect_anomalies}. The dCeNN encoder produces latent representations, the ELM head generates multivariate forecasts, and the detector computes residuals:
+The first half of the hybrid integration is the construction of the neural anomaly table. In \texttt{src/05\_detect\_anomalies.py}, the trained encoder, ridge head, scaler, and threshold artifacts are reloaded, and the supervised test matrix is rebuilt from the engineered CSV using the same lag and rolling configuration used earlier in the pipeline \cite{repo_thesis_grid_anomaly}. The dCeNN encoder produces latent representations, the ELM head generates multivariate forecasts, and the detector computes residuals:
 \begin{equation}
 	\mathbf{r}_t = \mathbf{y}_t - \hat{\mathbf{y}}_t.
 	\label{eq:hybrid_residual}
@@ -725,7 +725,7 @@ For each target dimension $j$, the detector also computes absolute residuals and
 	a_t^{(j)} = \mathbb{I}\!\left(\lvert r_t^{(j)} \rvert > \tau_j(c_t)\right),
 	\label{eq:hybrid_target_flag}
 \end{equation}
-where $\tau_j(c_t)$ is derived from the threshold-calibration stage and may depend on a context bucket $c_t$. In the current configuration, the thresholding method is labeled \texttt{conformal}, with \texttt{alpha = 0.90} and \texttt{bucket\_by = hour}, meaning that the anomaly decision is calibrated against validation residuals and then bucketed by hour-of-day \cite{repo_thresholds_config}.
+where $\tau_j(c_t)$ is derived from the threshold-calibration stage and may depend on a context bucket $c_t$. In the current configuration, the thresholding method is labeled \texttt{conformal}, with \texttt{alpha = 0.90} and \texttt{bucket\_by = hour}, meaning that the anomaly decision is calibrated against validation residuals and then bucketed by hour-of-day \cite{repo_thesis_grid_anomaly}.
 
 The anomaly table stores, for each target:
 \begin{itemize}
@@ -776,7 +776,7 @@ This design decision is more important than it may initially appear. It is the r
 
 \subsection{Stage 4: Concrete Fact Families Produced by the Integration Layer}
 
-The helper function \texttt{\_generate\_facts(...)} in \texttt{src/07\_apply\_asp.py} creates a string program of ASP facts from the anomaly table and engineered data \cite{repo_asp_apply}. Four main fact families are produced.
+The helper function \texttt{\_generate\_facts(...)} in \texttt{src/07\_apply\_asp.py} creates a string program of ASP facts from the anomaly table and engineered data \cite{repo_thesis_grid_anomaly}. Four main fact families are produced.
 
 \paragraph{1. Time facts.}
 Every relevant timestamp yields an atom of the form
@@ -848,7 +848,7 @@ Table~\ref{tab:hybrid_mapping_table} summarizes the mapping from neural/contextu
 
 \subsection{Stage 5: Reasoning Fusion Through \texttt{clingo}}
 
-Once the fact program has been built, the integration layer passes it to the ASP solver together with the rule base. In the repository, this occurs through \texttt{clingo.Control()}, followed by \texttt{add(...)} for the fact program, \texttt{load(...)} for the rule file, and \texttt{ground(...)} before solving \cite{repo_asp_apply}. Conceptually, the hybrid reasoning stage can be written as
+Once the fact program has been built, the integration layer passes it to the ASP solver together with the rule base. In the repository, this occurs through \texttt{clingo.Control()}, followed by \texttt{add(...)} for the fact program, \texttt{load(...)} for the rule file, and \texttt{ground(...)} before solving \cite{repo_thesis_grid_anomaly}. Conceptually, the hybrid reasoning stage can be written as
 \begin{equation}
 	\mathcal{M}_t = \mathrm{ASP}\!\left(\mathcal{F}_t, \mathcal{K}\right),
 	\label{eq:asp_model}

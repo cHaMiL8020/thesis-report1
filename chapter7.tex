@@ -99,6 +99,7 @@ These month-wise results are important because they show that a single global fo
 \end{figure}
 \FloatBarrier
 
+
 \subsection{Interpretation Relative to the Proposed Thesis Contribution}
 
 The forecasting results should now be interpreted in relation to the actual contribution claim of the thesis. If the thesis were claiming that dCeNN--ELM is the strongest standalone forecaster in absolute statistical terms, the committed benchmark results would not support that claim. Ridge is clearly stronger in the available benchmark table, and the detailed metrics show that forecasting performance remains difficult across several signals and seasons.
@@ -115,7 +116,7 @@ Third, the forecasting difficulty itself helps motivate the symbolic layer. The 
 
 Overall, the forecasting results paint a mixed but analytically valuable picture. In the committed repository benchmark table, Ridge is the strongest model in terms of raw forecasting accuracy and also the most efficient in training time, while LSTM is the weakest of the three across the main reported dimensions \cite{repo_thesis_grid_anomaly}. The proposed dCeNN--ELM backbone does not dominate on pure RMSE, but it does retain a strong efficiency advantage over LSTM and remains better aligned with the deployment and modularity goals of the full framework.
 
-The monthly evaluation further shows that forecasting difficulty is highly non-uniform across the year, with summer months---especially August---being the most challenging for several targets, particularly price and wind \cite{repo_thesis_grid_anomaly}. This leads to an important interpretive stance for the rest of Chapter~7. The value of the proposed system should not be judged solely by whether its forecasts outperform every baseline on every target. Rather, it should be judged by how its forecasting residuals, symbolic refinement, and finance-aware evaluation work together as an integrated anomaly-analysis system. The next section therefore turns from forecasting behaviour to anomaly-detection performance and examines how the ASP veto layer reshapes the raw anomaly set.
+The monthly evaluation further shows that forecasting difficulty is highly non-uniform across the year, with summer months--especially August--being the most challenging for several targets, particularly price and wind \cite{repo_thesis_grid_anomaly}. This leads to an important interpretive stance for the rest of Chapter~7. The value of the proposed system should not be judged solely by whether its forecasts outperform every baseline on every target. Rather, it should be judged by how its forecasting residuals, symbolic refinement, and finance-aware evaluation work together as an integrated anomaly-analysis system. The next section therefore turns from forecasting behaviour to anomaly-detection performance and examines how the ASP veto layer reshapes the raw anomaly set.
 
 \section{Neuro-Symbolic Refinement and False-Alarm Reduction}
 \label{sec:ns_refinement_false_alarm_reduction}

@@ -53,20 +53,20 @@ These rules do not attempt to represent the full complexity of the Austrian elec
 }
 
 \begin{lstlisting}[caption={market\_rules.lp (Corrected \& Enhanced for Explainable AI)}]
-	% ---------------------------------------------
+	% ------------------------------
 	% market_rules.lp (Corrected & Enhanced for Explainable AI)
-	% ---------------------------------------------
+	% ------------------------------
 	
 	#const min_persist = 3.
 	#const wind_ramp_limit = 500.
 	
-	% --- RULE 1: PERSISTENCE FILTER ---
+	% -- RULE 1: PERSISTENCE FILTER --
 	persistent(G, T) :- 
 	anomaly(G, T), 
 	anomaly(G, T-1), 
 	anomaly(G, T-2).
 	
-	% --- RULE 2: PHYSICS-BASED CONSTRAINTS (Lowercase names) ---
+	% -- RULE 2: PHYSICS-BASED CONSTRAINTS (Lowercase names) --
 	invalid_solar(T) :- 
 	anomaly("cf_solar", T),
 	pred(shortwave_radiation, R, T),
@@ -78,12 +78,12 @@ These rules do not attempt to represent the full complexity of the Austrian elec
 	pred(wind_mw, V0, T-1),
 	|V1 - V0| > wind_ramp_limit.
 	
-	% --- RULE 3: CO-ANOMALY LOGIC (Price-Load Correlation) ---
+	% -- RULE 3: CO-ANOMALY LOGIC (Price-Load Correlation) --
 	confirmed_economic_spike(T) :-
 	anomaly("price", T),
 	anomaly("load_mw", T).
 	
-	% --- RULE 4: FINAL REFINEMENT (The "Fusion") ---
+	% -- RULE 4: FINAL REFINEMENT (The "Fusion") --
 	valid_anomaly(G, T) :-
 	persistent(G, T),
 	not holiday(T),
@@ -95,7 +95,7 @@ These rules do not attempt to represent the full complexity of the Austrian elec
 	confirmed_economic_spike(T),
 	not holiday(T).
 	
-	% --- RULE 5: EXPLAINABLE AI (Veto Tracking) ---
+	% -- RULE 5: EXPLAINABLE AI (Veto Tracking) --
 	% Identify and categorize rejections for visualization
 	vetoed(G, T) :- anomaly(G, T), not valid_anomaly(G, T).
 	
@@ -103,7 +103,7 @@ These rules do not attempt to represent the full complexity of the Austrian elec
 	veto_reason(T, "wind_ramp_limit") :- excessive_wind_ramp(T).
 	veto_reason(T, "holiday_calendar") :- anomaly(G, T), holiday(T).
 	
-	% --- SHOW ATOMS ---
+	% -- SHOW ATOMS --
 	#show valid_anomaly/2.
 	#show vetoed/2.
 	#show veto_reason/2.

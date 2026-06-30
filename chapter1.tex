@@ -4,34 +4,69 @@ The transformation of modern electricity systems is inseparable from the rise of
 
 This shift creates a direct challenge for anomaly detection. In traditional industrial settings, abnormality is often approximated through static thresholds, linear residual models, or control-chart style assumptions about stable operating distributions. However, such assumptions become fragile in weather-dependent energy systems. A price spike, a renewable shortfall, or a load deviation may be significant in one operating regime but entirely expected in another. As multiple surveys have emphasized, time-series anomaly detection is fundamentally harder than i.i.d. anomaly detection because temporal dependence, seasonality, contextual effects, and concept drift make the definition of abnormality intrinsically dynamic \cite{chandola2009anomaly,blazquez2021review}. The problem is amplified in electricity applications, where exogenous weather inputs and market responses jointly shape the observed trajectories \cite{hong2016probabilistic,weron2014electricity}.
 
-A further limitation of purely statistical monitoring is that many practically important anomalies are not simple point outliers. In energy systems, anomalies may appear as contextual anomalies, where a value becomes abnormal only relative to a weather or calendar regime, or as collective anomalies, where a temporally extended pattern is abnormal even if no single point appears extreme in isolation \cite{chandola2009anomaly,blazquez2021review}. For example, a depressed photovoltaic output at noon on a clear summer day is suspicious, whereas the same output level at night is perfectly normal. Similarly, an abrupt price increase may be economically meaningful only when accompanied by corresponding changes in load, renewable availability, or system stress. Therefore, the practical question is not merely whether a data point is numerically extreme, but whether it represents a meaningful departure from expected multivariate system behaviour.
 
-These observations motivate the central premise of this thesis: anomaly detection for electricity markets and grid operations should be formulated as a context-aware forecasting and reasoning problem rather than as a static outlier screening task. The system should first learn the normal multivariate evolution of market and grid variables from historical data, then quantify deviations through calibrated residuals, and finally interpret those deviations in light of domain knowledge. Such a formulation is well aligned with weakly labelled operational settings, where anomaly labels are sparse, disputed, or unavailable, but historical records of normal operation are abundant \cite{chandola2009anomaly,shafer2008tutorial}. It is also aligned with the implementation developed in this thesis, where weather-informed forecasting, adaptive threshold calibration, and logical refinement are treated as complementary components of a single monitoring architecture.
+Many practically important anomalies are also not simple point outliers. They may
+be contextual, where a value is abnormal only relative to a particular weather or
+calendar regime, or collective, where an extended temporal pattern is abnormal
+even though no individual observation is extreme
+\cite{chandola2009anomaly,blazquez2021review}. For example, depressed photovoltaic
+output at noon on a clear summer day is suspicious, whereas the same output level
+at night is expected. Likewise, a price increase may become operationally important
+only when considered together with load, renewable availability, or other system
+conditions. The practical task is therefore to identify meaningful departures from
+expected multivariate behaviour rather than merely numerically extreme observations.
+
+These observations motivate the central premise of this thesis: anomaly detection
+for electricity markets and grid operations should be treated as a context-aware
+forecasting and reasoning problem rather than as static outlier screening. This
+formulation is well suited to weakly labelled operational settings, where trustworthy
+anomaly labels are sparse or unavailable but historical records of system behaviour
+are abundant \cite{chandola2009anomaly,shafer2008tutorial}. The specific learning,
+thresholding, and reasoning components used to realise this premise are introduced
+below and developed in the subsequent chapters.
+
+
 
 \section{The Neuro-Symbolic Paradigm}
 
-The methodological foundation of this work is the neuro-symbolic paradigm, which aims to combine the pattern-learning ability of neural models with the transparency and constraint-enforcement capability of symbolic reasoning \cite{garcez2009neural,gebser2012answer,gebser2019multi}. The motivation for this combination is straightforward. Neural methods are effective at extracting nonlinear structure from noisy, high-dimensional observations, but they do not automatically respect explicit domain rules. Symbolic methods, in contrast, provide a natural language for expressing physical constraints, temporal consistency requirements, and operational logic, but they are not designed to discover such structure directly from raw continuous data. In complex real-world systems, the two paradigms address different parts of the problem.
+The methodological foundation of this work is the neuro-symbolic paradigm, which combines the pattern-learning ability of neural models with the transparency and constraint-enforcement capability of symbolic reasoning \cite{garcez2009neural,gebser2012answer,gebser2019multi}. Neural methods are effective at extracting nonlinear structure from noisy, high-dimensional observations, but they do not automatically respect explicit domain rules. Symbolic methods provide a natural language for expressing physical constraints, temporal consistency requirements, and operational logic, but they are not designed to discover such structure directly from raw continuous data. The two paradigms therefore address complementary parts of the anomaly-detection problem.
 
-In the proposed framework, the neural component plays the role of perception. Given an engineered multivariate feature vector $\mathbf{x}_t \in \mathbb{R}^{d}$ at time $t$, the forecasting backbone produces an estimate of the expected target vector $\hat{\mathbf{y}}_t \in \mathbb{R}^{m}$,
+In the proposed framework, the neural component estimates expected system behaviour.
+Given an engineered multivariate feature vector
+$\mathbf{x}_t \in \mathbb{R}^{d}$ at time $t$, the forecasting backbone produces
+an estimate of the target vector $\hat{\mathbf{y}}_t \in \mathbb{R}^{m}$,
 \begin{equation}
 \hat{\mathbf{y}}_t = f_{\theta}(\mathbf{x}_t),
 \label{eq:intro_forecast}
 \end{equation}
-where $f_{\theta}(\cdot)$ denotes the learned forecasting model. In this thesis, $f_{\theta}$ is implemented as a lightweight hybrid of a Tiny discrete Cellular Neural Network (dCeNN) encoder and an Extreme Learning Machine (ELM)-style closed-form ridge regression head. The dCeNN component is motivated by the broader literature on locally connected cellular neural systems, which are attractive for efficient and structured computation \cite{chua1988cellular}. The ELM component is motivated by the need for analytical training speed and compact inference behaviour, properties that have made ELM-based regression attractive in fast forecasting settings \cite{huang2006extreme,hoerl1970ridge}.
+where $f_{\theta}(\cdot)$ is implemented as a lightweight Tiny discrete Cellular
+Neural Network (dCeNN) encoder followed by an Extreme Learning Machine
+(ELM)-style ridge regression head. These components are selected to support
+structured representation learning, efficient training, and compact inference
+\cite{chua1988cellular,huang2006extreme,hoerl1970ridge}.
 
-The symbolic component plays the role of reasoning. After forecasting, the residual vector
+After forecasting, the residual vector
 \begin{equation}
 \mathbf{r}_t = \mathbf{y}_t - \hat{\mathbf{y}}_t
 \label{eq:intro_residual}
 \end{equation}
-provides a quantitative measure of deviation from learned normality. A statistical anomaly candidate is first generated when a residual exceeds a calibrated threshold. Yet statistical surprise alone is not sufficient for credible operational monitoring. In energy systems, a detector should also account for rule-based structure: solar-related irregularities should be interpreted differently at night than at midday; holiday periods may justify unusual load behaviour; implausible wind ramps should be examined differently from plausible volatility. Such knowledge is naturally encoded in symbolic form through logic rules and constraint satisfaction \cite{gelfond1988stable,gebser2012answer,gebser2019multi}.
+quantifies deviation from expected behaviour. Residual thresholding first produces
+statistical anomaly candidates, after which symbolic rules evaluate their contextual
+and domain-level plausibility. This second stage allows information such as solar
+conditions, calendar effects, persistence, and relationships among signals to
+influence the final decision
+\cite{gelfond1988stable,gebser2012answer,gebser2019multi}.
 
-The neuro-symbolic view adopted here can therefore be written schematically as
+The resulting neuro-symbolic decision can be written schematically as
 \begin{equation}
 \tilde{a}_{t}^{(j)} = a_{t}^{(j)} \wedge \mathcal{R}\!\left(j,t,\mathbf{s}_t\right),
 \label{eq:intro_neurosymbolic}
 \end{equation}
-where $a_{t}^{(j)}$ is the statistical anomaly flag for target $j$, $\mathbf{s}_t$ denotes contextual state information, and $\mathcal{R}(\cdot)$ denotes the rule-based reasoning process that validates or vetoes the candidate. This architecture reflects a ``best of both worlds'' principle: the neural layer learns what is difficult to specify manually, while the symbolic layer enforces what should not be violated. The result is not only a more selective detector, but also a more interpretable one, since anomaly decisions can be traced both to predictive deviations and to explicit domain constraints.
+where $a_{t}^{(j)}$ is the statistical anomaly flag for target $j$,
+$\mathbf{s}_t$ denotes contextual state information, and $\mathcal{R}(\cdot)$
+represents the reasoning process that validates or vetoes the candidate. This
+separation between learned deviation detection and explicit rule-based refinement
+provides the conceptual basis for the framework developed in this thesis.
 
 \section{Problem Statement}
 
@@ -41,27 +76,43 @@ This thesis studies anomaly detection in hourly multivariate time series derived
 \end{equation}
 where, in the implemented pipeline, the principal targets correspond to solar capacity factor, wind capacity factor, load, and day-ahead price. The task is to learn normal system behaviour from historical data and then identify meaningful deviations on unseen future periods.
 
-A forecasting-based anomaly detector is adopted because large-scale, trustworthy anomaly labels are typically unavailable in operational electricity settings. Under this formulation, the model first predicts the expected target vector using \eqref{eq:intro_forecast}, then computes residuals using \eqref{eq:intro_residual}. A target-specific anomaly candidate is flagged when the magnitude of the residual exceeds an uncertainty-aware threshold,
+A forecasting-based anomaly detector is adopted because large-scale, trustworthy anomaly labels are typically unavailable in operational electricity settings. Under this formulation, the model first predicts the expected target vector using \eqref{eq:intro_forecast}, then computes residuals using \eqref{eq:intro_residual}. Because large-scale, trustworthy anomaly labels are typically unavailable in
+operational electricity settings, the task is formulated through forecasting residuals.
+Using the predictions and residuals defined in
+\eqref{eq:intro_forecast} and \eqref{eq:intro_residual}, a target-specific
+anomaly candidate is flagged when
 \begin{equation}
 a_{t}^{(j)} = \mathbb{I}\!\left(\left|r_{t}^{(j)}\right| > \tau_j(c_t)\right),
 \label{eq:intro_threshold}
 \end{equation}
-where $c_t$ denotes the operating context at time $t$ and $\tau_j(c_t)$ is a context-dependent threshold calibrated from validation residuals. In this thesis, contextual calibration is important because predictability differs systematically across hours, seasons, and special-calendar periods, a phenomenon widely recognized in load and price forecasting research \cite{hong2016probabilistic,weron2014electricity,shafer2008tutorial}.
+where $c_t$ denotes the operating context at time $t$ and $\tau_j(c_t)$ is a
+context-dependent threshold calibrated from validation residuals. Contextual
+calibration is used because predictability differs across hours, seasons, and
+special-calendar periods
+\cite{hong2016probabilistic,weron2014electricity,shafer2008tutorial}.
 
-The anomaly decision problem is not only statistical but also multivariate and operational. First, the target variables are strongly coupled: a price anomaly may be meaningful only when supported by concurrent load or renewable anomalies; conversely, a univariate spike may be benign when viewed jointly with the rest of the system. Second, the noise structure is heteroscedastic and regime-dependent, so a single global threshold is unsuitable. Third, many anomaly candidates are weakly informative unless they are filtered through physical and market logic. Finally, the detector is intended to operate in a deployment-conscious setting, which imposes practical constraints on training complexity, inference cost, and reproducibility.
+The resulting decision problem is multivariate and operational: signals are
+interdependent, residual variability changes across operating regimes, and some
+statistical candidates require physical or market context before they can be
+regarded as meaningful. The framework must also remain computationally efficient
+and reproducible enough to support deployment-oriented evaluation.
 
 To rank detected deviations, the framework additionally defines a composite severity score over all targets,
 \begin{equation}
 s_t = \sum_{j=1}^{m} \max\!\left(0, \frac{\left|r_t^{(j)}\right|}{\tau_j(c_t)+\varepsilon} - 1\right),
 \label{eq:intro_score}
 \end{equation}
-where $\varepsilon > 0$ is a small constant for numerical stability. This score supports event construction and downstream interpretation. The symbolic refinement stage then transforms raw statistical candidates into a logically filtered anomaly set, thereby yielding final anomaly outputs that are expected to be more physically plausible and more operationally meaningful than thresholded residuals alone.
+where $\varepsilon > 0$ is a small constant for numerical stability. This score
+supports event construction and downstream interpretation, while the symbolic
+stage converts the raw candidates into a contextually refined anomaly set.
 
 Accordingly, the problem addressed in this thesis can be stated as follows: \emph{given an hourly Austrian multivariate electricity dataset with weather and calendar context, and given a strict chronological train--validation--test protocol, design a lightweight and reproducible framework that learns normal behaviour through forecasting, detects anomalies through calibrated residual analysis, and refines those anomalies through symbolic reasoning to obtain interpretable, plausible, and decision-relevant abnormality signals.}
 
 \section{Research Objectives \& Questions}
 
-The overall objective of this thesis is to develop and evaluate a complete dCeNN--ELM--ASP framework for anomaly detection in weather-dependent electricity markets and grid operations. Rather than treating forecasting, uncertainty calibration, reasoning, and interpretability as disconnected tasks, the thesis integrates them into a single end-to-end monitoring pipeline. More specifically, the work pursues the following objectives:
+The overall objective of this thesis is to develop and evaluate a complete
+dCeNN--ELM--ASP framework for anomaly detection in weather-dependent electricity
+markets and grid operations. The work pursues the following specific objectives:
 \begin{enumerate}
     \item to design a reproducible anomaly detection pipeline covering data engineering, chronological splitting, model training, threshold calibration, anomaly detection, symbolic refinement, event construction, evaluation, and deployment-oriented export;
     \item to develop a lightweight multivariate forecasting backbone based on a Tiny dCeNN encoder and an ELM-style closed-form ridge regression head, thereby targeting a favourable trade-off between predictive capability and computational efficiency \cite{chua1988cellular,huang2006extreme,hoerl1970ridge};
@@ -81,23 +132,42 @@ These objectives lead to the following research questions:
     \item \textbf{RQ4: Practical deployability.} Compared with benchmark alternatives such as Ridge regression and LSTM forecasting, does the proposed framework provide a more favourable efficiency--performance trade-off for CPU-oriented or edge-oriented deployment?
 \end{enumerate}
 
-Together, these questions establish the scientific and engineering scope of the thesis. They recognize that anomaly detection in modern energy systems is not only a question of predictive error, but also a question of context, plausibility, interpretability, and usefulness.
+Together, these questions define the scientific and engineering scope against which
+the framework is evaluated in the later chapters.
 
 \section{Thesis Contributions}
 
-The contributions of this thesis are best understood as an integrated methodological contribution rather than as a claim that each individual component is novel in isolation. Forecasting, residual thresholding, cellular-style neural computation, ELM regression, and symbolic reasoning each have existing literatures of their own \cite{chandola2009anomaly,chua1988cellular,huang2006extreme,gebser2012answer}. The originality of the present work lies in how these ideas are combined into a coherent framework for anomaly detection in weather-dependent electricity systems, and in how the resulting system is evaluated from both scientific and operational perspectives.
 
-The main contributions are summarized as follows:
+The contribution of this thesis lies in integrating established learning,
+thresholding, and reasoning techniques into a coherent anomaly-detection framework
+for weather-dependent electricity systems. The main contributions are summarized
+as follows:
+
 \begin{enumerate}
-    \item \textbf{A hybrid neuro-symbolic anomaly detection architecture.} The thesis proposes a unified dCeNN--ELM--ASP framework in which a lightweight neural forecasting layer learns normal multivariate behaviour and a symbolic ASP layer validates or vetoes anomaly candidates using domain rules. This design explicitly bridges statistical learning and declarative reasoning within one anomaly detection pipeline.
-
-    \item \textbf{Context-aware residual detection under weather uncertainty.} The framework introduces validation-based, target-specific, and context-aware anomaly thresholds, enabling anomaly decisions to adapt to time-varying predictability rather than relying on globally fixed tolerances. This directly addresses the heteroscedastic and non-stationary behaviour typical of energy systems with strong weather dependence \cite{hong2016probabilistic,weron2014electricity,shafer2008tutorial}.
-
-    \item \textbf{Logical filtering for plausibility and interpretability.} By incorporating ASP after the statistical detection stage, the framework is able to reject anomalies that violate known physical or market logic, such as contextually explainable or physically implausible patterns. This improves trustworthiness and provides a transparent explanation layer for anomaly confirmation \cite{gelfond1988stable,gebser2019multi}.
-
-    \item \textbf{Event-level and utility-oriented anomaly interpretation.} Beyond timestamp-level flags, the thesis constructs event-level anomaly summaries and introduces a utility-oriented evaluation perspective. This moves the discussion from mere detection counts toward the operational and economic relevance of detected events, which is particularly important in electricity market analysis.
-
-    \item \textbf{A reproducible and deployment-conscious implementation.} The thesis delivers a complete and modular experimental pipeline, including data preprocessing, configuration-driven execution, baseline comparison, and compact model export. By making efficiency and reproducibility first-class concerns, the work contributes not only a conceptual method but also a practical pathway toward real monitoring deployments.
+	\item \textbf{A hybrid neuro-symbolic anomaly detection architecture.}
+	A unified dCeNN--ELM--ASP pipeline combines lightweight multivariate forecasting
+	with rule-based validation of anomaly candidates.
+	
+	\item \textbf{Context-aware residual detection under weather uncertainty.}
+	Validation-based, target-specific thresholds adapt anomaly decisions to
+	time-varying operating conditions rather than relying on a single global
+	tolerance
+	\cite{hong2016probabilistic,weron2014electricity,shafer2008tutorial}.
+	
+	\item \textbf{Logical filtering for plausibility and interpretability.}
+	ASP rules refine statistical candidates using explicit physical, temporal,
+	and market constraints and provide traceable reasons for the resulting
+	decisions \cite{gelfond1988stable,gebser2019multi}.
+	
+	\item \textbf{Event-level and utility-oriented anomaly interpretation.}
+	Timestamp-level detections are organised into events and examined from an
+	operational and economic perspective.
+	
+	\item \textbf{A reproducible and deployment-conscious implementation.}
+	The work provides a modular, configuration-driven experimental pipeline with
+	baseline comparison and compact model export.
 \end{enumerate}
 
-In summary, this thesis contributes a top-down anomaly detection methodology for electricity markets and grid operations that is simultaneously data-adaptive, uncertainty-aware, rule-compliant, and deployment-conscious. The framework is designed to show that, in weather-dependent and weakly labelled environments, reliable anomaly detection must combine predictive learning with explicit reasoning rather than relying on either paradigm alone.
+Together, these contributions define the integrated methodological and
+implementation scope evaluated throughout the remainder of the thesis.
+

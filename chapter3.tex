@@ -1,7 +1,7 @@
 \section{State-of-the-Art in Anomaly Detection}
 \label{sec:sota_anomaly_detection}
 
-Anomaly detection is the task of identifying observations, subsequences, or events that deviate significantly from an expected notion of normal behaviour. In time-series analysis, this problem is considerably harder than in i.i.d.\ tabular settings because abnormality is not determined only by magnitude. It is shaped by temporal order, seasonality, exogenous context, multivariate coupling, and time-varying uncertainty \cite{chandola2009anomaly,blazquez2021review}. In electricity markets and grid operations, the problem is further complicated by the fact that a statistically unusual pattern may still be physically plausible or operationally unimportant once weather, calendar context, and market conditions are taken into account \cite{hong2016probabilistic,weron2014electricity}. For that reason, a rigorous review of anomaly detection must begin not only with model families, but also with the theoretical meaning of anomalies in temporal data and the dominant methodological paradigms used to detect them.
+Time-series anomaly detection concerns the identification of observations, subsequences, or events that deviate from expected behaviour. Unlike anomaly detection in i.i.d.\ data, temporal abnormality may depend on seasonality, exogenous context, multivariate relationships, and changing uncertainty \cite{chandola2009anomaly,blazquez2021review}. These characteristics are particularly relevant in electricity markets and grid operations, where weather, calendar conditions, and market state influence the interpretation of unusual patterns \cite{hong2016probabilistic,weron2014electricity}. This section reviews the principal deep-learning paradigms used for time-series anomaly detection and their suitability for operational energy applications.
 
 \subsection{What is Anomaly Detection? Theoretical Framing}
 
@@ -70,8 +70,6 @@ Autoencoder-based methods are attractive because they do not require labels and 
 
 The strengths of autoencoders are clear. They are flexible, unsupervised, and naturally suitable when normal data dominate the training set. They also offer a direct and interpretable anomaly mechanism through reconstruction error. However, their limitations are equally important. First, highly expressive autoencoders can sometimes reconstruct anomalies too well, thereby reducing the contrast between normal and abnormal patterns. Second, reconstruction error alone does not necessarily tell whether an anomaly is operationally meaningful, physically plausible, or economically relevant. Third, generic autoencoders often ignore explicit domain rules unless those rules are incorporated externally.
 
-For the thesis, literature review on autoencoders is essential because they represent the canonical reconstruction-based branch of deep anomaly detection. Even though the implementation does not currently benchmark an autoencoder model, including them in the review makes it theoretically complete and helps position the proposed method against the broader field.
-
 \subsection{CNN-Based Time-Series Anomaly Detectors}
 
 Convolutional neural networks became important in time-series anomaly detection because one-dimensional convolutions can learn local motifs, shift-invariant temporal patterns, and multi-scale structures efficiently. A temporal convolution layer applies a kernel over recent observations:
@@ -105,8 +103,6 @@ LSTM-based anomaly detectors appear in three major forms. First, forecasting-bas
 
 The key strength of LSTMs is their direct handling of temporal order. Compared with simple CNNs, they are generally better at modeling long sequential dependencies when anomaly evidence depends on accumulated historical context. This explains why they became highly influential in industrial telemetry, cyber-physical monitoring, and energy forecasting tasks. Nevertheless, important limitations remain. Training and inference are less parallelizable than in convolutional architectures because recurrence is sequential. Long-horizon dependency modeling still degrades in practice, despite the gating mechanism. Most importantly for this thesis, LSTM-based detectors usually remain black-box statistical detectors. They can identify that a sequence does not fit learned dynamics, but not whether the detected deviation is physically valid, contextually explainable, or actionable for downstream market decisions.
 
-This point is especially relevant because the current codebase of the thesis explicitly includes an LSTM benchmark alongside the proposed model.
-
 \subsection{Transformer-Based Time-Series Anomaly Detectors}
 
 Transformers replaced recurrence with self-attention, enabling each time step to interact directly with many others in the sequence \cite{vaswani2017attention}. The scaled dot-product attention mechanism is
@@ -119,8 +115,6 @@ where $Q$, $K$, and $V$ are query, key, and value matrices. In time-series model
 Transformer-based anomaly detectors are widely regarded as part of the current state of the art in multivariate time-series anomaly detection. Their main advantage is flexibility: they can learn both local and global dependencies, and they can model cross-channel interactions in a unified attention mechanism. Anomaly Transformer is a representative example, arguing that anomalies manifest through abnormal association discrepancy in the attention structure itself \cite{xu2022anomalytransformer}. TranAD combines Transformer representations with reconstruction-style learning and adversarial components, achieving strong performance across benchmark datasets \cite{tuli2022tranad}. These methods are particularly compelling when anomalies arise not merely from scalar deviations but from disrupted temporal relationships.
 
 Despite these strengths, Transformer-based detectors also introduce trade-offs. Self-attention can be computationally expensive, often scaling quadratically with sequence length. This becomes problematic for long-horizon monitoring or resource-constrained environments. In addition, although attention maps are sometimes interpreted as a form of interpretability, they do not automatically provide domain-level explanations. They may indicate which time steps influenced the model, but they do not directly explain whether the anomaly violates a physical law, a market rule, or an operational constraint. As a result, even sophisticated Transformer-based detectors may remain statistically powerful but operationally opaque.
-
-In energy-market settings, this limitation matters. A detector may capture long-range market-weather dependencies effectively, yet still fail to say whether a flagged event is decision-relevant. Thus, while Transformers represent a critical state-of-the-art family, they do not by themselves resolve the interpretability and actionability requirements that motivate the present thesis.
 
 \subsection{Comparative Synthesis for Energy-System Anomaly Detection}
 
@@ -150,20 +144,34 @@ A clear progression emerges from the literature. Autoencoders established recons
 
 \subsection{Implications for the Thesis}
 
-For a thorough literature review, the value of the state-of-the-art discussion lies not only in listing strong models, but also in revealing what remains unresolved. The evidence from the above literature suggests three conclusions that are directly relevant to this thesis.
+The reviewed model families provide strong mechanisms for learning statistical
+regularities in multivariate time series. However, their outputs are generally not
+constrained by explicit physical, calendar, or market knowledge. Statistical
+irregularity alone therefore does not establish whether an event is contextually
+plausible or operationally relevant.
 
-First, deep learning has clearly advanced anomaly detection in multivariate time series. Autoencoders, CNNs, LSTMs, and Transformers all improve the ability to learn normal dynamics from complex data. Second, these advances are largely statistical: the models detect patterns that are surprising relative to training data, but they rarely encode physical or market rules explicitly. Third, in electricity-market and grid settings, statistical surprise is not sufficient. A useful detector must distinguish between rare but explainable behaviour and truly decision-relevant anomalies.
-
-This is precisely where the present thesis is positioned. The literature reviewed here justifies going one step further: beyond black-box detection toward a neuro-symbolic framework in which statistical anomaly candidates are refined through explicit reasoning. In that sense, the contribution of the present work is not to deny the power of deep anomaly detection, but to build on its strengths while addressing persistent weaknesses in interpretability, plausibility, and actionability.
+This limitation motivates a complementary reasoning stage that can examine
+statistical anomaly candidates using explicit domain knowledge. The symbolic-AI
+literature relevant to this role is reviewed in the following section.
 
 \section{Symbolic AI in Energy Systems}
 \label{sec:symbolic_ai_energy_systems}
 
-Symbolic Artificial Intelligence refers to AI methods that represent knowledge explicitly in symbolic form and reason over that knowledge through rules, relations, constraints, ontologies, or formal inference procedures. Unlike purely statistical learning, symbolic AI does not primarily learn by adjusting millions of parameters to minimize prediction error. Instead, it encodes what is known about a domain in an interpretable representation and applies principled reasoning to derive conclusions, explanations, or decisions \cite{russell2021ai,buchanan1984rulebased,baral2003knowledge,sowa2000knowledge}. This distinction is especially important in engineering systems, where some knowledge is too important to be left implicit. In electricity markets and power-grid operations, domain intelligence includes physical laws, operational procedures, market rules, calendar effects, contingency logic, equipment constraints, and operator heuristics. A system that ignores such structure may achieve statistical accuracy while still producing conclusions that are physically implausible or operationally unusable.
+Symbolic Artificial Intelligence represents domain knowledge explicitly through
+facts, rules, relations, constraints, ontologies, or formal inference procedures
+\cite{russell2021ai,buchanan1984rulebased,baral2003knowledge,sowa2000knowledge}.
+This is particularly relevant in engineering systems, where physical constraints,
+operational procedures, market rules, and exception cases should remain visible
+and verifiable rather than being represented only implicitly within a learned
+model.
 
-For this reason, symbolic AI has a long and non-trivial history in energy systems. Before the present wave of deep learning, knowledge-based systems and expert systems were already being developed for power-system diagnosis, restoration, alarm interpretation, and operator support. These early systems were motivated by a practical insight that remains highly relevant today: grid operation is not only a prediction problem, but also a reasoning problem. A breaker trip, an abnormal load pattern, or a suspicious renewable signal must often be interpreted within a context of rules, dependencies, exceptions, and action priorities. In modern smart-grid settings, where the system has become more data-rich, weather-sensitive, market-coupled, and operationally complex, the need for explicit reasoning has not disappeared. It has instead changed form. Rather than standing alone as a complete AI solution, symbolic reasoning is increasingly used as part of a broader neuro-symbolic architecture in which data-driven learning and rule-based reasoning complement one another.
+Symbolic methods have a long history in power-system diagnosis, alarm processing,
+restoration, and operator support. This section reviews that development from
+classical expert systems to declarative logic, Answer Set Programming, and
+neuro-symbolic integration, with particular attention to rule-aware anomaly
+interpretation.
 
-This section therefore expands the symbolic-AI discussion along three axes. First, it revisits the foundations of symbolic reasoning and explains why explicit knowledge representation matters in energy systems. Second, it reviews the classical role of expert systems and knowledge-based reasoning in power engineering, including inference mechanisms, explanation facilities, and their historical strengths and weaknesses. Third, it develops the transition from production-rule systems to logic programming and Answer Set Programming (ASP), and shows why these more expressive declarative paradigms are especially suitable for rule-aware anomaly filtering in modern electricity-market applications. The result is not simply a background review, but a theoretical bridge toward the ASP-based neuro-symbolic refinement layer used in the present thesis.
+
 
 \subsection{What Symbolic AI Means in Engineering Contexts}
 
@@ -282,50 +290,45 @@ These paradigms matter for the present thesis because they show that symbolic AI
 
 \subsection{Why Symbolic AI Still Matters in Weather-Driven Energy Systems}
 
-It may be tempting to assume that modern deep learning makes symbolic reasoning obsolete. For weather-driven energy systems, the opposite is closer to the truth. As electricity markets become increasingly coupled to renewable variability and operational context, the meaning of abnormality becomes harder to define statistically. A low renewable output may be suspicious or entirely normal depending on radiation, wind, season, and curtailment context. A price anomaly may be relevant only when corroborated by load, supply, or market-state information. A detector that ignores such context risks producing false positives that are statistically surprising but operationally uninteresting.
+The growth of deep learning has not removed the need for symbolic reasoning in
+weather-driven energy systems. As renewable generation, market behaviour, and
+grid operation become more context-dependent, a statistically unusual observation
+may still be explainable through weather, calendar, curtailment, or operating-state
+information \cite{amin2005toward,fang2012smartgrid,momoh2012smart}.
 
-Modern smart-grid literature emphasizes that the power grid is evolving into a cyber-physical, communication-rich, and highly coordinated infrastructure \cite{amin2005toward,fang2012smartgrid,momoh2012smart}. This evolution increases the volume of data, but it also increases the number of explicit rules and interdependencies that matter. In such settings, symbolic AI plays at least three continuing roles.
-
-First, it enforces \textbf{plausibility}. Some statistically detected patterns should be rejected because they conflict with known physical or operational facts.
-
-Second, it supports \textbf{interpretability}. In high-stakes infrastructure, users need reasons. A symbolic layer can say not only that something was rejected, but that it was rejected because it occurred on a holiday, because solar radiation was absent, or because a wind-ramp condition made the candidate implausible.
-
-Third, it supports \textbf{actionability}. A raw anomaly score does not by itself say what should be investigated. A symbolically refined anomaly is often much closer to an operationally meaningful event.
+Symbolic reasoning remains valuable for three related purposes: it can reject
+candidates that conflict with known physical or operational conditions, provide
+explicit reasons for confirmation or rejection, and help distinguish alerts that
+are operationally relevant from those that are merely statistically unusual. These
+roles complement rather than replace statistical learning.
 
 \subsection{From Pure Symbolic Systems to Neuro-Symbolic Energy Intelligence}
 
-Despite these strengths, symbolic AI alone is not sufficient for modern anomaly detection in energy systems. The main reason is representational mismatch. Raw multivariate signals prices, load trajectories, wind generation, solar radiation, calendar features, and derived proxies are continuous, noisy, and high dimensional. Classical symbolic systems generally require such inputs to be abstracted into symbolic facts before reasoning can begin. That abstraction step is non-trivial and often benefits from data-driven learning.
+Symbolic methods alone are not sufficient for anomaly detection in continuous,
+noisy, and high-dimensional energy data. Such systems generally require sensor and
+market observations to be converted into symbolic facts before reasoning can take
+place, while the relevant temporal relationships may be difficult to specify
+manually.
 
-This is where neuro-symbolic design becomes compelling. A learning layer can process raw multivariate time series, produce forecasts or anomaly candidates, and summarize continuous evidence into structured signals. A symbolic layer can then reason over those signals, enforcing rules and explaining final decisions. In other words, learning is used where pattern extraction is hard to specify manually, while symbolic reasoning is used where explicit knowledge should constrain or validate the result.
-
-This division of labour is particularly suitable in electricity-market anomaly detection. Statistical models are good at learning normal behaviour under complex, weather-driven variability. Symbolic models are good at deciding whether a detected deviation is physically plausible, contextually justified, or operationally important. The hybrid architecture therefore inherits strengths from both paradigms while mitigating their weaknesses.
+A neuro-symbolic design addresses this limitation by assigning complementary roles
+to the two paradigms. A learning component models multivariate temporal behaviour
+and produces anomaly candidates, while a symbolic component evaluates those
+candidates using explicit contextual and domain constraints. This division is
+particularly suitable for electricity-market and grid-monitoring applications,
+where both statistical sensitivity and domain-level reasoning are required.
 
 \subsection{Expanded View of Symbolic AI in the Present Thesis}
 
-The symbolic layer in the present thesis is not a generic add-on; it is an explicit reasoning module that refines anomaly outputs produced by the learning stage. In the repository implementation, the ASP application script reads anomaly tables and engineered data, generates symbolic facts for each timestamp, and invokes \texttt{clingo} over a rule base \cite{asp_apply}. The generated facts include anomaly indicators, holiday flags, shortwave radiation values, wind power values, actual load, and context-aware reference load. Thus, the symbolic layer receives not only the output of the anomaly detector, but also the contextual evidence needed to judge whether the anomaly is plausible or explainable.
+The present thesis adopts this neuro-symbolic pattern by translating statistical
+anomaly candidates and selected contextual variables into symbolic facts that are
+evaluated using ASP. The symbolic layer represents persistence, calendar context,
+physical plausibility, cross-signal support, and explicit veto information
+\cite{asp_apply,repo_thesis_grid_anomaly}.
 
-The associated ASP rule base captures several kinds of symbolic reasoning \cite{repo_thesis_grid_anomaly}. First, a \emph{persistence filter} requires anomaly evidence across multiple consecutive time steps, thereby suppressing isolated noise-like spikes. Second, \emph{physics-based rules} reject solar anomaly candidates when radiation is absent and check wind anomalies against an explicit ramp constraint. Third, a \emph{co-anomaly rule} confirms certain price anomalies when they are supported by simultaneous load anomalies, thereby encoding a market-oriented relationship rather than a purely univariate threshold. Fourth, the rule base produces not only confirmed anomalies, but also \emph{vetoed} anomalies and \emph{veto reasons}. This is especially important because it gives the symbolic layer an explanation function rather than merely a binary filter.
-
-A minimalized abstraction of the implemented reasoning can be expressed as follows:
-\begin{lstlisting}[style=asprules,caption={Representative ASP refinement rules.},label={lst:asp_rules}]
-	% Rule: A feature is persistent if it shows anomalies across three consecutive steps
-	persistent(G,T) :- anomaly(G,T), anomaly(G,T-1), anomaly(G,T-2).
-	
-	% Rule: Solar anomalies are invalid if there is no shortwave radiation (e.g., at night)
-	invalid_solar(T) :- anomaly(cf_solar,T), pred(shortwave_radiation,R,T), R <= 0.
-	
-	% Rule: Economic spikes are confirmed if both price and load show anomalies
-	confirmed_economic_spike(T) :- anomaly(price,T), anomaly(load_mw,T).
-	
-	% Rule: General validation criteria (persistence and excluding holidays/solar errors)
-	valid_anomaly(G,T) :- persistent(G,T), not holiday(T), not invalid_solar(T).
-	
-	% Rule: Specific validation for economic spikes
-	valid_anomaly(price,T) :- confirmed_economic_spike(T), not holiday(T).
-\end{lstlisting}
-This captures the conceptual essence of the thesis approach: anomaly candidates are not treated as final truths merely because a statistical detector produced them. They must also survive symbolic scrutiny. That is precisely the kind of interpretability- and actionability-oriented reasoning that generic black-box detectors often lack.
-
-The repository even includes a small \texttt{clingo} debugging script that manually injects a solar anomaly with zero radiation, illustrating how the symbolic layer can explicitly test and reject a physically implausible scenario \cite{repo_thesis_grid_anomaly}. This small implementation detail is conceptually significant: it shows that the ASP layer is not decorative, but genuinely operational in the pipeline.
+Since the theoretical foundations of ASP were introduced in
+Chapter~\ref{sec:Slimemold}, the repository-specific fact generation, rule
+families, and solver integration are described in Chapter~\ref{sec:methods}. The
+complete ASP rule base is provided in Appendix~\ref{sec:appendix-netlogo}.
 
 \subsection{Comparative Synthesis}
 
@@ -357,30 +360,35 @@ Table~\ref{tab:symbolic_energy_methods_expanded} summarizes the main symbolic pa
 
 \subsection{Implications for the Thesis Gap}
 
-The symbolic-AI literature in energy systems leads to a clear conclusion. Classical expert systems demonstrated that explicit knowledge representation is valuable for power engineering whenever explanation, procedure, and rule compliance matter. Logic programming and ASP made this tradition more expressive and more principled, especially in the presence of defaults and exceptions. Yet symbolic systems alone are not well suited to extracting structure directly from noisy, high-dimensional, weather-dependent time series.
+The reviewed literature reveals complementary strengths. Data-driven methods can
+learn complex patterns from noisy multivariate signals, whereas symbolic methods
+provide explicit constraints, explanations, and rule compliance. Neither paradigm
+alone fully satisfies both requirements.
 
-This observation creates the precise motivation for the present thesis. Pure deep-learning anomaly detectors are powerful at statistical pattern extraction, but weak at explicit reasoning. Pure symbolic systems are strong at explanation and rule compliance, but weak at learning directly from raw multivariate signals. A neuro-symbolic architecture resolves this mismatch by allowing the learning layer to discover candidate anomalies and the symbolic layer to determine whether those candidates are plausible, meaningful, and actionable. In that sense, symbolic AI is not a side topic in this thesis; it is one half of the central methodological argument.
+Their integration therefore addresses a gap that remains unresolved by purely
+statistical or purely symbolic approaches. The following section formulates this
+gap more specifically in terms of interpretability and actionability.
 
 \section{The Gap: Interpretability and Actionability in Existing Models}
 \label{sec:gap_analysis}
 
-The preceding review sections establish two important facts. First, modern anomaly detection has advanced substantially through deep learning. Autoencoders, CNNs, LSTMs, and Transformers have improved the ability to model complex temporal structure and detect statistical deviations in multivariate time series. Second, symbolic AI has long demonstrated the value of explicit knowledge representation, rule compliance, and explanation in energy-system decision support. Yet these two traditions have often evolved in parallel rather than in genuinely integrated form. As a consequence, an important research gap remains: most existing anomaly detection systems are strong at detecting \emph{statistical irregularity}, but much weaker at determining whether a detected irregularity is \emph{interpretable}, \emph{plausible}, and \emph{actionable} in the operational sense.
+The preceding review shows that deep models provide strong statistical pattern
+recognition, while symbolic methods provide explicit knowledge representation and
+rule-based reasoning. However, these capabilities are rarely integrated fully in
+energy-oriented anomaly detection. The resulting gap is the limited ability of
+existing systems to determine whether statistically unusual events are also
+interpretable, contextually plausible, and relevant to downstream operational or
+market decisions.
 
-This gap is particularly visible in electricity markets and weather-driven grid operations. In such settings, the central question is not merely whether a model can assign a high anomaly score to a timestamp. The more important question is whether the flagged event corresponds to something meaningful for downstream monitoring, diagnosis, or market decisions. A model that detects many anomalies but cannot explain them, justify them, or connect them to operational or financial consequences may still be scientifically interesting, yet practically limited. This section therefore identifies the key gap that motivates the present thesis: the lack of anomaly-detection frameworks that combine \emph{statistical sensitivity}, \emph{symbolic interpretability}, and \emph{decision-level actionability} within a single coherent architecture.
+
 
 \subsection{From Statistical Detection to Usable Intelligence}
 
-Most anomaly detectors can be described at an abstract level as functions that map observations to scores and then to binary decisions. Let $\mathbf{x}_t$ denote the observed multivariate signal at time $t$. A detector computes an anomaly score
-\begin{equation}
-	s_t = f_{\theta}(\mathbf{x}_{1:t}, \mathbf{c}_t),
-	\label{eq:gap_score}
-\end{equation}
-followed by a thresholded decision
-\begin{equation}
-	z_t = \mathbb{I}(s_t > \tau_t).
-	\label{eq:gap_binary}
-\end{equation}
-This formulation is sufficient when the only objective is to identify statistically unusual behaviour. It is not sufficient when the detector is expected to support operational decisions. In high-stakes infrastructure, a useful anomaly decision must usually answer at least four questions:
+As described in Section~\ref{sec:sota_anomaly_detection}, most anomaly detectors
+map observations to anomaly scores and then to thresholded decisions. This is
+sufficient for identifying statistical irregularity, but it does not by itself
+establish whether a detected event is suitable for operational use. A useful
+anomaly decision should therefore address at least four questions:
 \begin{enumerate}
 	\item \textbf{Was the event statistically unusual?}
 	\item \textbf{Is the event physically or contextually plausible?}
@@ -388,9 +396,13 @@ This formulation is sufficient when the only objective is to identify statistica
 	\item \textbf{Does the event matter for a downstream decision or utility function?}
 \end{enumerate}
 
-Most of the anomaly-detection literature focuses primarily on the first question and, to a lesser extent, on the second. The third and fourth questions are addressed far less systematically. This is not merely a presentation issue; it is a methodological gap. A detector may produce excellent precision, recall, F1-score, AUROC, or forecasting residual metrics while still being of limited operational value if its outputs cannot be trusted, explained, or translated into concrete responses \cite{chandola2009anomaly,blazquez2021review}.
-
-For energy systems, this problem is amplified because anomaly meaning is deeply contextual. A large deviation may be harmless under one weather regime and highly significant under another. A market anomaly may be statistically strong but operationally irrelevant. Conversely, a moderate deviation may matter greatly if it coincides with a critical load condition, renewable shortfall, or adverse market state. Thus, the literature gap is not just the lack of better scores. It is the lack of frameworks that systematically bridge the path from \emph{detection} to \emph{understanding} to \emph{decision relevance}.
+Most anomaly-detection research focuses primarily on statistical unusualness,
+while explanation and downstream relevance are addressed less systematically
+\cite{chandola2009anomaly,blazquez2021review}. In energy systems, this limitation
+is amplified because the meaning of a deviation depends on weather, calendar
+conditions, operating state, and relationships among signals. The unresolved
+problem is therefore not only improving anomaly scores, but connecting detection
+to understanding and decision relevance.
 
 \subsection{The Interpretability Gap in Black-Box Deep Anomaly Detection}
 
@@ -415,15 +427,22 @@ This disconnect can be expressed formally. Suppose a detector produces a binary 
 \end{equation}
 where $u(\cdot)$ represents task-specific reward, cost, penalty, or benefit. Existing anomaly-detection models typically optimize a surrogate objective related to reconstruction error, forecasting loss, or representation discrepancy, but they rarely close the loop to the utility level. As a result, the literature contains a structural gap between \emph{what is optimized during modeling} and \emph{what matters during decision support}.
 
-The implementation of the present thesis makes this gap concrete. The repository includes a finance-aware mapping step that converts anomaly outputs into actions, penalties, bonuses, and cumulative utility, rather than stopping at the anomaly table \cite{repo_thesis_grid_anomaly}. A separate utility-comparison script explicitly contrasts a purely neural strategy against the proposed neuro-symbolic strategy in terms of cumulative utility and penalty reduction \cite{repo_thesis_grid_anomaly}. This implementation detail is methodologically important: it highlights that actionability is treated here as an explicit modeling objective, whereas in much of the literature it remains implicit or absent.
+The present thesis addresses this issue by evaluating anomaly outputs through a
+finance-aware utility formulation rather than stopping at statistical detection
+metrics. The evaluation design is presented in Chapter~\ref{sec:implementation},
+and the corresponding results are reported in Chapter~\ref{sec:results}.
 
 \subsection{Why Existing Symbolic Approaches Alone Do Not Fully Close the Gap}
 
-One might ask whether symbolic AI alone already solves the interpretability and actionability problem. The answer is only partially. Classical expert systems, knowledge-based systems, and logic-programming approaches are indeed much stronger than black-box models at explanation, constraint enforcement, and procedural reasoning. However, they are not naturally suited to extracting structure directly from large, noisy, and continuous multivariate time series. Electricity markets and weather-driven grids generate signals whose relevant abnormality patterns are often subtle, nonlinear, and distributed across many correlated variables. Building a purely symbolic anomaly detector that captures such patterns without a learned statistical component is extremely difficult.
+Symbolic methods improve explanation, rule enforcement, and procedural reasoning,
+but they do not naturally learn subtle nonlinear patterns directly from large,
+continuous, and noisy multivariate time series. Deep models provide this statistical
+sensitivity, but generally offer less explicit domain-level reasoning.
 
-This means that symbolic AI solves only one side of the problem. It provides \emph{semantic discipline}, but not necessarily \emph{statistical sensitivity}. Deep learning solves the opposite side: it provides statistical sensitivity, but not semantic discipline. The research gap therefore cannot be closed by choosing one paradigm and discarding the other. Instead, it requires a principled combination in which the learning layer identifies candidate irregularities from data and the symbolic layer determines whether those candidates survive domain-level scrutiny.
-
-This point is particularly important for the present thesis because the goal is not merely interpretable reasoning in the abstract. The goal is an anomaly-detection framework that remains effective in weakly labelled, weather-dependent, multivariate energy data while still delivering outputs that are plausible and actionable. Pure symbolic systems struggle with the first half of this requirement. Pure deep systems struggle with the second half.
+The gap therefore cannot be closed by selecting one paradigm and excluding the
+other. It requires a hybrid architecture in which a learning component identifies
+candidate irregularities and a symbolic component evaluates them against explicit
+contextual and domain constraints.
 
 \subsection{A Comparative Statement of the Gap}
 

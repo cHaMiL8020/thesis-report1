@@ -66,16 +66,8 @@ This means that the thesis objectives are not answered in a simplistic ``all met
 
 \subsection{Implications for Future Work}
 
-The discussion also points naturally toward future research directions. The first is to strengthen the forecasting backbone without sacrificing the compactness that makes the dCeNN--ELM design attractive for edge deployment. Since Ridge performs strongly in the current benchmark snapshot, a particularly promising direction would be hybrid or ensemble formulations that preserve the efficiency of linear structure while retaining nonlinear latent features.
-
-The second direction is to deepen the symbolic layer. The current rule base is intentionally compact, which helps interpretability and manageability, but it also limits the semantic breadth of the explanations. Extending the rule base to include richer market logic, uncertainty-aware exceptions, or region-specific operating constraints could make the refinement layer even more valuable.
-
-The third direction is to improve the scalability of the reasoning stage. Incremental ASP, rolling symbolic windows, or multi-tier reasoning architectures could help preserve interpretability while reducing the cost of symbolic refinement in larger or faster environments.
-
-Finally, the finance-aware evaluation could be deepened into more realistic operational or trading scenarios. Even in its current form, it already shifts the evaluation away from abstract anomaly counts and toward downstream usefulness. A stronger future implementation could connect this logic to richer market simulation, probabilistic action policies, or operator decision-support workflows.
+The findings identify four broad priorities for future work: strengthening the forecasting backbone without sacrificing compactness, extending the semantic coverage of the ASP rule base, improving the scalability of symbolic reasoning, and developing more realistic finance-aware or operational evaluation scenarios. These directions follow directly from the limitations identified in the preceding discussion, while their specific implementation possibilities are presented in Chapter~9.
 
 \subsection{Closing Synthesis}
 
-In summary, the discussion confirms that the most important contribution of this thesis is not a claim of absolute forecasting superiority, but the demonstration of a coherent and practically motivated neuro-symbolic anomaly-analysis framework. The dCeNN--ELM backbone provides a compact forecasting core; the ASP layer provides interpretability and false-alarm refinement; the software architecture provides modularity and edge-conscious deployment; and the results framework evaluates not only prediction quality, but also anomaly plausibility and downstream usefulness.
-
-That combination is what allows the work to answer its research questions in a meaningful way. The thesis shows that lightweight neuro-symbolic anomaly detection for weather-dependent electricity systems is both feasible and valuable, provided that its strengths and limits are interpreted honestly. In that sense, the research has achieved its central objective: it has demonstrated that combining learning and reasoning can improve the quality of anomaly analysis beyond what either paradigm would provide alone.
+Overall, the discussion shows that the main value of the thesis lies in the integration of learning, symbolic reasoning, and downstream evaluation rather than in a claim of universal forecasting superiority. The framework combines a compact dCeNN--ELM forecasting core, interpretable ASP-based refinement, modular implementation, and utility-oriented assessment within one coherent pipeline. Chapter~9 summarizes the final findings, limitations, and future research directions.

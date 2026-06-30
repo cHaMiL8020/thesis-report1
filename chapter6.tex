@@ -279,6 +279,75 @@ The benchmark discussion is also important for interpreting edge feasibility. Th
 
 This is a reasonable and academically defensible claim. In the current edge-AI literature, there is a wide continuum between heavy cloud inference and ultra-constrained TinyML microcontrollers \cite{antonini2023tinyml}. The proposed model sits in the practical middle: it is intentionally much lighter than many deep recurrent or Transformer systems, yet still expressive enough for multivariate forecasting under weather uncertainty. The export script and pure NumPy runtime make that middle-ground position concrete.
 
+To complement the model-level forecasting benchmark reported in
+Chapter~\ref{sec:results}, an additional resource-profile script was used to
+measure batched inference time, incremental process memory, and parameter count
+for the three forecasting models. The measurements were produced by
+\texttt{src/19\_global\_performance\_table.py} under the CPU-based environment
+described in Section~6.2.1. The results are summarized in
+Table~\ref{tab:supplementary_resource_profile}.
+
+\begin{table}[H]
+	\centering
+	\caption{Supplementary batched-inference resource profile for the forecasting
+		models. Latency is reported as total test-set inference time divided by the
+		number of test samples.}
+	\label{tab:supplementary_resource_profile}
+	\begin{tabular}{lrrr}
+		\hline
+		\textbf{Model}
+		& \textbf{Amortized latency}
+		& \textbf{Incremental RAM}
+		& \textbf{Parameters} \\
+		& \textbf{(ms/sample)}
+		& \textbf{(MB)}
+		& \\
+		\hline
+		Ridge Regression
+		& 0.00048
+		& 12.00
+		& Not reported \\
+		
+		dCeNN--ELM
+		& 0.00134
+		& 15.25
+		& 8,016 \\
+		
+		LSTM
+		& 0.05466
+		& 58.37
+		& 79,364 \\
+		\hline
+	\end{tabular}
+	
+	\vspace{1mm}
+	\begin{minipage}{0.94\linewidth}
+		\footnotesize
+		The latency values represent amortized batched throughput and should not
+		be interpreted as direct single-sample response times. Incremental RAM is
+		calculated from the process resident-memory difference before and after
+		inference and does not represent peak memory consumption.
+	\end{minipage}
+\end{table}
+
+Under this batched measurement protocol, Ridge Regression remains the fastest
+and records the lowest observed incremental memory use. The proposed
+dCeNN--ELM model nevertheless provides a substantially lighter alternative to
+the LSTM benchmark. Its amortized inference time is approximately
+$40.8$ times lower than that of the LSTM, while its observed incremental memory
+use is approximately $73.9\%$ lower. The dCeNN--ELM model also contains
+approximately $89.9\%$ fewer parameters than the LSTM
+($8{,}016$ compared with $79{,}364$).
+
+These results support the intended positioning of dCeNN--ELM as a computational
+middle ground. It is more resource-intensive than the linear Ridge baseline, but
+considerably lighter than the recurrent LSTM model. Since the measurements were
+obtained from a single software environment and use batched inference, they
+should be interpreted as implementation-specific evidence of relative efficiency
+rather than as hardware-independent latency guarantees.
+
+
+
 \subsection{Strengths and Limits of the Current Edge Design}
 
 The edge design provides a NumPy-only runtime, a compact self-contained model bundle, CPU-oriented inference, and a clear separation between training and deployment dependencies. However, the current export focuses on the forecasting core rather than the complete anomaly-detection pipeline. Threshold calibration, ASP reasoning, and finance mapping are not included in the exported edge runtime. The edge-readiness claim should therefore be interpreted as applying primarily to small CPU-based devices such as Raspberry Pi or Jetson-class platforms, rather than to bare-metal microcontrollers. Within this scope, the implementation demonstrates a credible lightweight forecasting backbone for edge-oriented anomaly-detection systems.

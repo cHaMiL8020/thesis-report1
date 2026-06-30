@@ -27,6 +27,12 @@ The benchmark comparison table available in the repository summarizes the main m
 	\end{tabular}
 \end{table}
 
+
+A supplementary comparison of batched inference throughput, incremental memory
+usage, and model parameter counts is provided in
+Table~\ref{tab:supplementary_resource_profile} in Section~6.2.7.
+
+
 The committed benchmark results reveal a mixed but highly informative pattern. Ridge Regression is the strongest model in terms of raw RMSE across all four targets and is also the fastest both in training and inference. LSTM, while much more expressive in principle, is substantially slower and does not outperform Ridge in the current benchmark snapshot. The proposed dCeNN--ELM model lies between these two baselines in computational behaviour: it is dramatically faster than LSTM in training and inference, but slower than Ridge, as expected for a nonlinear latent model. In forecasting accuracy, however, it does not surpass Ridge in the currently committed results and also remains weaker than LSTM for solar and wind RMSE.
 
 This outcome is academically important and should be stated honestly. The proposed architecture does not dominate the baselines on pure forecasting error in the benchmark artifact currently stored in the repository. Nevertheless, the result is still meaningful for the thesis because the claimed value of the dCeNN--ELM model is not solely ``best RMSE at all costs.'' Rather, its intended role is to provide a lightweight nonlinear forecasting backbone that remains computationally modest, structurally interpretable, and easily integrable with threshold calibration, ASP refinement, and edge export. The benchmark comparison therefore establishes the trade-off context for the rest of the chapter: forecasting accuracy must be interpreted together with deployment and neuro-symbolic utility, not in isolation.

@@ -161,7 +161,7 @@ The engineered feature space augments the raw operational variables with calenda
 
 \subsection{Holiday and Calendar Features}
 
-A central part of the engineered context is the holiday and calendar representation. In the repository, \texttt{src/00\_make\_holidays.py} generates an Austrian public-holiday calendar for the years 2017--2022 using the \texttt{holidays} package and stores it as a dedicated CSV referenced in the base configuration \cite{repo_thesis_grid_anomaly,repo_thesis_grid_anomaly}. Each holiday is stored with a UTC-normalized date and a holiday name, producing a machine-readable calendar artifact that can be joined consistently with the hourly time index.
+A central part of the engineered context is the holiday and calendar representation. In the repository, \texttt{src/00\_make\_holidays.py} generates an Austrian public-holiday calendar for the years 2017--2022 using the \texttt{holidays} package and stores it as a dedicated CSV referenced in the base configuration \cite{repo_thesis_grid_anomaly}. Each holiday is stored with a UTC-normalized date and a holiday name, producing a machine-readable calendar artifact that can be joined consistently with the hourly time index.
 
 The preprocessing stage then uses this calendar file to construct three binary context indicators:
 \begin{align}
